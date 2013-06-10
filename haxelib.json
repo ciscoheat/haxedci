@@ -4,7 +4,7 @@
   "license": "MIT",
   "tags": ["cross", "dci"],
   "description": "A DCI library for Haxe",
-  "version": "0.0.1",
-  "releasenote": "Initial release.",
+  "version": "0.0.2",
+  "releasenote": "Fixed macro problem for files without package.",
   "contributors": ["ciscoheat"]
 }

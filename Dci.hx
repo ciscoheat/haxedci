@@ -31,11 +31,13 @@ class Dci
 					Context.error("A Context Role cannot be public.", field.pos);
 				
 				var c = Context.getLocalClass().get();
-				var pack = macro $p{c.pack};
+				var pack = c.pack.length > 0 
+					? [macro $p{c.pack}]
+					: [];
 				
-				field.meta.push({name: ":allow", params: [pack], pos: Context.currentPos()});
+				field.meta.push( { name: ":allow", params: pack, pos: Context.currentPos() } );				
 			}
-					
+			
 			switch(field.kind)
 			{
 				case FFun(f):
