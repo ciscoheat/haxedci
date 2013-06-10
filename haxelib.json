@@ -1,0 +1,10 @@
+{
+  "name": "haxedci",
+  "url" : "https://github.com/ciscoheat/haxedci",
+  "license": "MIT",
+  "tags": ["cross", "dci"],
+  "description": "A DCI library for Haxe",
+  "version": "0.0.1",
+  "releasenote": "Initial release.",
+  "contributors": ["ciscoheat"]
+}
