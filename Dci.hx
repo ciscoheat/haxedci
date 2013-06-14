@@ -13,10 +13,13 @@ class Dci
 	{
         var fields : Array<Field> = Context.getBuildFields();
 		var contextClass = Context.getLocalClass().get();		
-				
+
+		if (contextClass.pack.length == 0)
+			Context.error('Error: A Context with no package cannot be accessed by its Roles. Move the Context "${contextClass.module}" to a package.', contextClass.pos);
+
 		var isStatic = function(a) { return a == Access.AStatic; };
 		var isPublic = function(a) { return a == Access.APublic; };
-		var hasRole = function(m) { return m.name == "role"; };		
+		var hasRole = function(m) { return m.name == "role"; };
 		var thisMacro = macro this;
 		
 		for (field in fields)
@@ -28,11 +31,9 @@ class Dci
 			if (Lambda.exists(field.meta, hasRole))
 			{			
 				if (Lambda.exists(field.access, isPublic))
-					Context.error("A Context Role cannot be public.", field.pos);
-									
-				var pack = contextClass.pack.length > 0 ? contextClass.pack : [contextClass.name];
-					
-				field.meta.push( { name: ":allow", params: [macro $p{pack}], pos: Context.currentPos() } );				
+					Context.error("Error: A Context Role cannot be public.", field.pos);
+								
+				field.meta.push( { name: ":allow", params: [macro $p{contextClass.pack}], pos: Context.currentPos() } );
 			}
 			
 			switch(field.kind)

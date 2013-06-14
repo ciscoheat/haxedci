@@ -4,7 +4,7 @@
   "license": "MIT",
   "tags": ["cross", "dci"],
   "description": "A DCI library for Haxe",
-  "version": "0.1.0",
-  "releasenote": "Added 'self' in RoleMethods. Fixed a package bug.",
+  "version": "0.1.1",
+  "releasenote": "A macro error is now issued if a Context has no package.",
   "contributors": ["ciscoheat"]
 }
