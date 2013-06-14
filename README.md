@@ -15,4 +15,4 @@ Install via [haxelib](http://haxe.org/doc/haxelib/using_haxelib):
 Then put `-lib haxedci` into your hxml.
 
 ## Example/Demo
-Clone the [haxedci-example](https://github.com/ciscoheat/haxedci-example) repository or [download it](https://github.com/ciscoheat/haxedci-example/archive/master.zip), then open the FlashDevelop project file or just execute run.bat (or run if you're on Linux). Also checkout the README file in that repository, it has a little introduction.
+Clone the [haxedci-example](https://github.com/ciscoheat/haxedci-example) repository, then open the FlashDevelop project file or just execute run.bat (or run if you're on Linux). Also checkout the README file in that repository, it has an introduction to DCI.

@@ -12,11 +12,11 @@ class Dci
 	@macro public static function context() : Array<Field>
 	{
         var fields : Array<Field> = Context.getBuildFields();
-		
+		var contextClass = Context.getLocalClass().get();		
+				
 		var isStatic = function(a) { return a == Access.AStatic; };
 		var isPublic = function(a) { return a == Access.APublic; };
-		var hasRole = function(m) { return m.name == "role"; };
-		
+		var hasRole = function(m) { return m.name == "role"; };		
 		var thisMacro = macro this;
 		
 		for (field in fields)
@@ -26,16 +26,13 @@ class Dci
 
 			// Add @:allow(currentPackage) to fields annotated with @role
 			if (Lambda.exists(field.meta, hasRole))
-			{
+			{			
 				if (Lambda.exists(field.access, isPublic))
 					Context.error("A Context Role cannot be public.", field.pos);
-				
-				var c = Context.getLocalClass().get();
-				var pack = c.pack.length > 0 
-					? [macro $p{c.pack}]
-					: [];
-				
-				field.meta.push( { name: ":allow", params: pack, pos: Context.currentPos() } );				
+									
+				var pack = contextClass.pack.length > 0 ? contextClass.pack : [contextClass.name];
+					
+				field.meta.push( { name: ":allow", params: [macro $p{pack}], pos: Context.currentPos() } );				
 			}
 			
 			switch(field.kind)
@@ -66,8 +63,11 @@ class Dci
         var fields : Array<Field> = Context.getBuildFields();
 		var contextName = getTypeName(typeExpr);
 		var contextType : Type = Context.getType(contextName);
+		var roleType = Context.getLocalType();
+		var typePath = Context.toComplexType(contextType);
 		
 		var contextMacro = macro context;
+		var currentContextMacro = macro var context : $typePath = Dci.currentContext;
 		
 		// Inject context local variable in RoleMethods.
 		for (field in fields)
@@ -82,8 +82,20 @@ class Dci
 					switch(f.expr.expr)
 					{					
 						case EBlock(exprs):
-							var typePath : Null<ComplexType> = Context.toComplexType(contextType);
-							exprs.unshift(macro var context : $typePath = Dci.currentContext);
+							
+							// Inject self
+							switch(Context.getLocalClass().get().kind)
+							{
+								case KAbstractImpl(a):
+									var type = a.get().name;
+									var fieldName = type.charAt(0).toLowerCase() + type.substr(1);
+									exprs.unshift(macro var self = context.$fieldName);
+									
+								case _: Context.error("Expected Abstract class for Role.", Context.currentPos());
+							}
+							
+							// Inject context
+							exprs.unshift(currentContextMacro);
 							
 						case _:
 					}
