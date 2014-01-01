@@ -4,7 +4,7 @@
   "license": "MIT",
   "tags": ["cross", "dci"],
   "description": "A DCI library for Haxe",
-  "version": "0.1.1",
-  "releasenote": "A macro error is now issued if a Context has no package.",
+  "version": "0.2.0",
+  "releasenote": "Complete rewrite with much nicer syntax!",
   "contributors": ["ciscoheat"]
 }

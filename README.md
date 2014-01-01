@@ -4,10 +4,6 @@
 ## Short introduction
 DCI stands for Data, Context, Interaction. One of the key aspects of DCI is to separate what a system *is* (form, class properties) from what it *does* (function, methods). Form and function has very different rates of change so they should be separated, not as it currently is, put in classes together.
 
-A Context rounds up Data objects that take on the part as Roles, then an Interaction takes place as a flow of messages through the Roles. The Roles define a network of communicating objects and the Role methods force the objects to collaborate according to the distributed interaction algorithm.
-
-([fulloo.info](http://fulloo.info) is your friend if this sounds confusing)
-
 ## Download and Install
 Install via [haxelib](http://haxe.org/doc/haxelib/using_haxelib):
 `haxelib install haxedci`

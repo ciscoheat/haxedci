@@ -1,4 +1,4 @@
 package dci;
 
-@:autoBuild(Dci.context()) interface Context
+@:autoBuild(dci.Dci.context()) interface Context
 {}
