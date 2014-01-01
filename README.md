@@ -2,7 +2,7 @@
 [Haxe](http://haxe.org) is a nice multiplatform language which in its third release (May 2013), enables a complete DCI implementation. If you don't know what DCI is, go to [fulloo.info](http://fulloo.info) for documentation, details, overview and more.
 
 ## Short introduction
-DCI stands for Data, Context, Interaction. One of the key aspects of DCI is to separate what a system *is* (form, class properties) from what it *does* (function, methods). Form and function has very different rates of change so they should be separated, not as it currently is, put in classes together.
+DCI stands for Data, Context, Interaction. One of the key aspects of DCI is to separate what a system *is* (data) from what it *does* (function). Data and function has very different rates of change so they should be separated, not as it currently is, put in classes together.
 
 ## Download and Install
 Install via [haxelib](http://haxe.org/doc/haxelib/using_haxelib):
