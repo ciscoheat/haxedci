@@ -97,8 +97,7 @@ class Dci
 					
 					if (fieldArray.length != newArray.length)
 					{
-						// Parse the final field and replace the old one.
-						e.expr = Context.parse(newArray.join("."), e.pos).expr;
+						e.expr = buildField(newArray, newArray.length-1, e.pos);
 						return;
 					}					
 				}
@@ -108,7 +107,7 @@ class Dci
 		
 		e.iter(function(e) { replaceRoleMethodCalls(e, roleMethods, roleName); });
 	}
-	
+
 	// Extract the field to an array. this.test.length = ['this', 'test', 'length']
 	// Also replace "self" with the roleName if set.
 	private static function extractField(e : Expr, roleName : String)
@@ -140,6 +139,15 @@ class Dci
 					return null;
 			}
 		}
+	}
+	
+	// The reverse of extractField.
+	private static function buildField(identifiers, i, pos)
+	{
+		if (i > 0)
+			return EField({expr: buildField(identifiers, i - 1, pos), pos: pos}, identifiers[i]);
+		else
+			return EConst(CIdent(identifiers[i]));
 	}
 	
 	private static function addRole(field : Field, output : Array<Field>)
