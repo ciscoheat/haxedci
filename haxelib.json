@@ -4,7 +4,7 @@
   "license": "MIT",
   "tags": ["cross", "dci"],
   "description": "A DCI library for Haxe",
-  "version": "0.2.0",
-  "releasenote": "Complete rewrite with much nicer syntax!",
+  "version": "0.2.1",
+  "releasenote": "Removed generated RoleMethods from autocompletion.",
   "contributors": ["ciscoheat"]
 }

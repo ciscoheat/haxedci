@@ -16,7 +16,7 @@ class Dci
 		
 		//trace("Context: " + Context.getLocalClass());
 		
-		var output = [];
+		var roleFields = [];
 		var nonRoleFields = [];
 		var roleMethods = new RoleMap();
 		
@@ -26,7 +26,7 @@ class Dci
 			//if (Lambda.exists(field.meta, function(m) { return m.name == "dump"; } )) trace(field);
 			
 			if (Lambda.exists(field.meta, hasRole))
-				addRole(field, output);
+				addRole(field, roleFields);
 			else
 				nonRoleFields.push(field);
 		}
@@ -35,7 +35,7 @@ class Dci
 		for (field in fields)
 		{
 			if (Lambda.exists(field.meta, hasRole))
-				addRoleMethods(field, output, roleMethods);
+				addRoleMethods(field, roleFields, roleMethods);
 		}
 		
 		// Third pass: Replace function calls with Role method calls, where appropriate		
@@ -55,7 +55,7 @@ class Dci
 				ex.iter(function(e) { replaceRoleMethodCalls(e, roleMethods, isRole ? field.name : null); });
 		}
 		
-		return output.concat(nonRoleFields);
+		return roleFields.concat(nonRoleFields);
 	}
 	
 	// Replace Role method calls with the transformed version.
@@ -216,12 +216,14 @@ class Dci
 		}		
 	}
 	
-	private static function contextField(kind : FieldType, name : String, access : Array<Access>, pos : Position) : Field
+	private static function contextField(kind : FieldType, name : String, access : Array<Access>, pos : Position, meta : Array<MetadataEntry> = null) : Field
 	{
+		if (meta == null) meta = [];
+		
 		var output = {
 			pos: pos,
 			name: name,
-			meta: [],
+			meta: meta,
 			kind: kind,
 			doc: null,
 			access: access
@@ -254,8 +256,9 @@ class Dci
 							{
 								case EFunction(name, f):
 									var methodName = roleMethodName(field.name, name);
+									var noCompletion = { pos: f.expr.pos, params: [], name: ":noCompletion" };
 									//trace("Adding role method: " + methodName);
-									output.push(contextField(FFun(f), methodName, [APrivate], f.expr.pos));
+									output.push(contextField(FFun(f), methodName, [APrivate], f.expr.pos, [noCompletion]));
 									
 									if (!methods.exists(field.name))
 										methods.set(field.name, []);
