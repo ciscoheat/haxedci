@@ -199,6 +199,7 @@ class Dci
 	{
 		if (Context.defined("display") && roleInterfaceList.exists(fieldName))
 		{
+			// Creates a compile error if RoleInterface field exists on the type, which is useful.
 			return TExtend(type, roleInterfaceList[fieldName]);
 		}
 
@@ -210,6 +211,16 @@ class Dci
 	{
 		if (Context.defined("display") && roleInterfaceList.exists(fieldName))
 		{
+			// Test if there are RoleInterface/Method name collisions
+			var hash = new Map<String, Field>();
+			for (field in fields) hash[field.name] = field;
+					
+			for (method in roleMethodNames[fieldName])
+			{
+				if (hash.exists(method))
+					Context.error('The RoleInterface field "' + hash[method].name + '" has the same name as a RoleMethod.', hash[method].pos);
+			}
+				
 			return TAnonymous(fields.concat(roleInterfaceList[fieldName]));
 		}
 

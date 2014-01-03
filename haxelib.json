@@ -4,7 +4,7 @@
   "license": "MIT",
   "tags": ["cross", "dci"],
   "description": "A DCI library for Haxe",
-  "version": "0.3.0",
-  "releasenote": "Now with autocompletion for RoleMethods.",
+  "version": "0.3.1",
+  "releasenote": "Checks for RoleInterface/Method name collisions.",
   "contributors": ["ciscoheat"]
 }
