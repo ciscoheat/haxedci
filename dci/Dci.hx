@@ -2,6 +2,9 @@ package dci;
 import haxe.crypto.Adler32;
 import haxe.macro.Expr;
 import haxe.macro.Context;
+import sys.FileSystem;
+import sys.io.File;
+import sys.io.FileOutput;
 
 using haxe.macro.ExprTools;
 
@@ -46,10 +49,10 @@ class Dci
 	}
 	
 	public function execute() : Array<Field>
-	{
-		//trace("Context: " + Context.getLocalClass());
-			
+	{		
 		var fields = Context.getBuildFields();
+
+		//trace("=== Context: " + Context.getLocalClass());
 
 		// First pass: Add Role methods and create the RoleInterfaces map.
 		for (field in fields)
@@ -63,25 +66,46 @@ class Dci
 			if(hasRole(field)) addRole(field);
 		}
 		
+		#if !nographs
+		FileSystem.createDirectory("./bin");
+		FileSystem.createDirectory("./bin/dcigraphs");
+		var file = File.write("./bin/dcigraphs/" + Context.getLocalClass() + ".htm", false);
+		var diagram = new DiagramGenerator(Context.getLocalClass().toString());
+		#end
+		
 		// Third pass: Replace function calls with Role method calls, where appropriate		
 		for (field in fields)
 		{
 			var isRole = hasRole(field);
 			
 			var ex : Expr;
+			var functionName : String = null;
+			
 			switch(field.kind)
 			{
-				case FVar(_, e): ex = e;					
-				case FFun(f): ex = f.expr;
-				case FProp(_, _, _, e): ex = e;
+				case FVar(_, e): 
+					ex = e;
+				case FFun(f): 
+					ex = f.expr;
+					functionName = field.name;
+				case FProp(_, _, _, e): 
+					ex = e;
 			}
 			
 			if (ex != null)
-				ex.iter(function(e) { replaceRoleMethodCalls(e, isRole ? field.name : null); } );
+				ex.iter(function(e) { replaceRoleMethodCalls(e, isRole ? field.name : null, functionName, diagram); } );
 				
 			if (!isRole)
 				nonRoleFields.push(field);
 		}
+		
+		#if !nographs
+		var title = Context.getLocalClass();
+		file.writeString('<!DOCTYPE html>\n<html><head><title>$title</title></head><body><div class=wsd wsd_style="roundgreen"><pre>\n');
+		file.writeString(diagram.generateSequenceDiagram());
+		file.writeString("</pre></div><script src='http://www.websequencediagrams.com/service.js'></script></body></html>");
+		file.close();
+		#end
 		
 		for (roleName in roleMethods.keys())
 		{
@@ -100,12 +124,17 @@ class Dci
 	}
 
 	// Replace Role method calls with the transformed version.
-	// TODO: It's optimized for speed, but could make it a bit nicer.
-	// TODO: Detect role method reference and 'self' reference, and act accordingly.
-	function replaceRoleMethodCalls(e : Expr, roleName : String)
+	// If roleName is null, we're not in a RoleMethod.
+	// If methodName is null, we're not in a method (rather a var or property)
+	function replaceRoleMethodCalls(e : Expr, roleName : String, methodName : String, generator : DiagramGenerator)
 	{
 		switch(e.expr)
 		{
+			case EFunction(name, f):
+				// Note that anonymous functions will have name == null, then keep previous name.
+				replaceRoleMethodCalls(f.expr, roleName, name != null ? name : methodName, generator);
+				return;
+			
 			case EField(e3, fd):
 				var fieldArray = extractField(e, roleName);
 				if (fieldArray != null)
@@ -131,7 +160,24 @@ class Dci
 							continue;
 						}
 						
-						var roleMethod = roleMethodName(field, fieldArray[i + 1]);						
+						var roleMethod = roleMethodName(field, fieldArray[i + 1]);
+						
+						if (generator != null)
+						{
+							if (roleName == null && methodName != null)
+							{
+								generator.addInteraction(methodName, field, fieldArray[i + 1]);
+							}
+							else if (roleName != null && methodName != null)
+							{
+								generator.addRoleMethodCall(roleName, methodName, field, fieldArray[i + 1]);
+							}
+							else
+							{
+								trace("*** " + roleName + "." + methodName);
+							}
+						}
+
 						newArray.push(roleMethod);
 						skip = true; // Skip next field since it's now a part of the Role method call.
 					}
@@ -147,7 +193,7 @@ class Dci
 			case _: 
 		}
 		
-		e.iter(function(e) { replaceRoleMethodCalls(e, roleName); });
+		e.iter(function(e) { replaceRoleMethodCalls(e, roleName, methodName, generator); });
 	}
 
 	// Extract the field to an array. this.test.length = ['this', 'test', 'length']
@@ -233,7 +279,9 @@ class Dci
 	{
 		if (field.name == SELF)
 			Context.error('A Role cannot be named "$SELF", it is used as an accessor within RoleMethods.', field.pos);
-		
+		else if (field.name == "Context")
+			Context.error('A Role cannot be named "Context".', field.pos);
+			
 		var error = function(p) { Context.error("Incorrect Role definition: Must be a var.", p); };
 		
 		switch(field.kind)
@@ -256,6 +304,8 @@ class Dci
 				}
 				else
 				{
+					var found = false;
+					
 					switch(e.expr)
 					{
 						// The role is defined using a block, so search for a RoleInterface.
@@ -276,27 +326,33 @@ class Dci
 														var fieldType = mergeAnonymousInterfaces(field.name, fields);
 														roleFields.push(contextField(FVar(fieldType), field.name, [APrivate], expr.pos));
 														roleInterfaces[field.name] = fieldType;
-														return;
+														found = true;
 														
 													case TPath(p):
 														//trace("Adding Role: " + field.name + " with simple RoleInterface");
 														var fieldType = mergeTypeAndRoleInterface(field.name, p);
 														roleFields.push(contextField(FVar(fieldType), field.name, [APrivate], expr.pos));
 														roleInterfaces[field.name] = fieldType;
-														return;
+														found = true;
 														
 													case _: Context.error("RoleInterfaces must be defined as a Type or with class notation according to http://haxe.org/manual/struct#class-notation", expr.pos);
 												}												
 											}
-										}										
+											else
+											{
+												Context.error("The only variable that can exist in a Role definition must be named \"" + ROLEINTERFACE + "\".", expr.pos);
+											}
+										}
 										
 									case _:
 								}
 							}
 							
-							//trace("No RoleInterface found, adding Role " + field.name + " as Dynamic");
-							roleFields.push(contextField(FVar(TPath( { name: 'Dynamic', pack: [], params: [] } ), null), field.name, [APrivate], e.pos));
-							return;
+							if (!found)
+							{
+								//trace("No RoleInterface found, adding Role " + field.name + " as Dynamic");
+								roleFields.push(contextField(FVar(TPath( { name: 'Dynamic', pack: [], params: [] } ), null), field.name, [APrivate], e.pos));
+							}
 							
 						case _: error(e.pos);
 					}
@@ -410,6 +466,10 @@ class Dci
 										}
 										
 										roleInterfaceList[field.name].push(contextField(FFun(functionDef), name, [], f.expr.pos));
+									}
+									else
+									{
+										//haxe.macro.Context.warning("The RoleMethod " + field.name + "." + name + " has no return type, add it if you need autocompletion.", f.expr.pos);
 									}
 									
 								case _:
