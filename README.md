@@ -12,3 +12,6 @@ Then put `-lib haxedci` into your hxml.
 
 ## Example/Demo
 Clone the [haxedci-example](https://github.com/ciscoheat/haxedci-example) repository, then open the FlashDevelop project file or just execute run.bat (or run if you're on Linux). Also checkout the README file in that repository, it has an introduction to DCI.
+
+## Special features
+When you compile, [sequence diagrams](http://en.wikipedia.org/wiki/Sequence_diagram) will automatically be generated for the Contexts, placed in the `bin/dcigraphs` directory. Quite useful for visualizing the distributed algorithm in a Context, and how the Roles interact with each other. If you don't want this feature, you can turn it off by compiling with `-D nodcigraphs`.

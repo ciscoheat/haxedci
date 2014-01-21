@@ -66,7 +66,7 @@ class Dci
 			if(hasRole(field)) addRole(field);
 		}
 		
-		#if !nographs
+		#if !nodcigraphs
 		FileSystem.createDirectory("./bin");
 		FileSystem.createDirectory("./bin/dcigraphs");
 		var file = File.write("./bin/dcigraphs/" + Context.getLocalClass() + ".htm", false);
@@ -99,7 +99,7 @@ class Dci
 				nonRoleFields.push(field);
 		}
 		
-		#if !nographs
+		#if !nodcigraphs
 		var title = Context.getLocalClass();
 		file.writeString('<!DOCTYPE html>\n<html><head><title>$title</title></head><body><div class=wsd wsd_style="roundgreen"><pre>\n');
 		file.writeString(diagram.generateSequenceDiagram());
