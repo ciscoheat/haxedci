@@ -4,7 +4,7 @@
   "license": "MIT",
   "tags": ["cross", "dci"],
   "description": "A DCI library for Haxe",
-  "version": "0.4.0",
-  "releasenote": "Sequence diagrams are now automatically generated for Contexts.",
+  "version": "0.4.1",
+  "releasenote": "Made sequence diagram generation optional instead of automatic. See README.",
   "contributors": ["ciscoheat"]
 }

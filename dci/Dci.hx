@@ -28,6 +28,7 @@ class Dci
 		return new Dci().execute();
 	}
 
+	private static var CONTEXT = "context";
 	private static var SELF = "self";
 	private static var ROLEINTERFACE = "roleInterface";
 
@@ -66,11 +67,13 @@ class Dci
 			if(hasRole(field)) addRole(field);
 		}
 		
-		#if !nodcigraphs
+		#if dcigraphs
 		FileSystem.createDirectory("./bin");
 		FileSystem.createDirectory("./bin/dcigraphs");
 		var file = File.write("./bin/dcigraphs/" + Context.getLocalClass() + ".htm", false);
 		var diagram = new DiagramGenerator(Context.getLocalClass().toString());
+		#else
+		var diagram = null;
 		#end
 		
 		// Third pass: Replace function calls with Role method calls, where appropriate		
@@ -99,7 +102,7 @@ class Dci
 				nonRoleFields.push(field);
 		}
 		
-		#if !nodcigraphs
+		#if dcigraphs
 		var title = Context.getLocalClass();
 		file.writeString('<!DOCTYPE html>\n<html><head><title>$title</title></head><body><div class=wsd wsd_style="roundgreen"><pre>\n');
 		file.writeString(diagram.generateSequenceDiagram());
@@ -171,10 +174,6 @@ class Dci
 							else if (roleName != null && methodName != null)
 							{
 								generator.addRoleMethodCall(roleName, methodName, field, fieldArray[i + 1]);
-							}
-							else
-							{
-								trace("*** " + roleName + "." + methodName);
 							}
 						}
 
@@ -279,7 +278,7 @@ class Dci
 	{
 		if (field.name == SELF)
 			Context.error('A Role cannot be named "$SELF", it is used as an accessor within RoleMethods.', field.pos);
-		else if (field.name == "Context")
+		else if (field.name == "Context") // Reserved for sequence diagrams.
 			Context.error('A Role cannot be named "Context".', field.pos);
 			
 		var error = function(p) { Context.error("Incorrect Role definition: Must be a var.", p); };
@@ -489,7 +488,9 @@ class Dci
 				
 		switch(f.expr.expr)
 		{
-			case EBlock(exprs): exprs.unshift(macro var $SELF = this.$roleName);				
+			case EBlock(exprs): 
+				exprs.unshift(macro var $SELF = this.$roleName);
+				exprs.unshift(macro var $CONTEXT = this);
 			case _:
 		}
 	}
