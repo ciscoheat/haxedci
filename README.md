@@ -18,7 +18,7 @@ If you compile with the flag `-D dcigraphs`, [sequence diagrams](http://en.wikip
 
 ## DCI Resources
 Website - [fulloo.info](http://fulloo.info) <br>
-FAQ - [DCI FAQ](fulloo.info/doku.php?id=faq) <br>
+FAQ - [DCI FAQ](http://fulloo.info/doku.php?id=faq) <br>
 Support - [stackoverflow](http://stackoverflow.com/questions/tagged/dci), tagging the question with **dci** <br>
 Discussions - [Object-composition](https://groups.google.com/forum/?fromgroups#!forum/object-composition) <br>
 Wikipedia - [DCI entry](http://en.wikipedia.org/wiki/Data,_Context,_and_Interaction) <br>
