@@ -1,5 +1,5 @@
 # DCI in Haxe
-[Haxe](http://haxe.org) is a nice multiplatform language which in its third release (May 2013), enables a complete DCI implementation. If you don't know what DCI is, go to [fulloo.info](http://fulloo.info) for documentation, details, overview and more.
+[Haxe](http://haxe.org) is a nice multiplatform language which enables a full DCI implementation. If you don't know what DCI is, check the Example/Demo below for an introduction.
 
 ## Short introduction
 DCI stands for Data, Context, Interaction. One of the key aspects of DCI is to separate what a system *is* (data) from what it *does* (function). Data and function has very different rates of change so they should be separated, not as it currently is, put in classes together.
@@ -11,7 +11,7 @@ Install via [haxelib](http://haxe.org/doc/haxelib/using_haxelib):
 Then put `-lib haxedci` into your hxml.
 
 ## Example/Demo
-Clone the [haxedci-example](https://github.com/ciscoheat/haxedci-example) repository, then open the FlashDevelop project file or just execute run.bat (or run if you're on Linux). Also checkout the README file in that repository, it has an introduction to DCI.
+Browse to the [haxedci-example](https://github.com/ciscoheat/haxedci-example) repository for an introduction to DCI, and a downloadable demo.
 
 ## Special features
 If you compile with the flag `-D dcigraphs`, [sequence diagrams](http://en.wikipedia.org/wiki/Sequence_diagram) will automatically be generated for the Contexts, placed in the `bin/dcigraphs` directory. Useful for visualizing the distributed algorithm in a Context, and how the Roles interact with each other.
