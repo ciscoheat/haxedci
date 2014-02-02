@@ -1,4 +1,7 @@
 package dci;
+import sys.FileSystem;
+import sys.io.File;
+import sys.io.FileOutput;
 import haxe.ds.GenericStack.GenericStack;
 
 // Data structure for storing all RoleMethod calls.
@@ -80,6 +83,10 @@ class DiagramGenerator
 	 */
 	public function generateSequenceDiagram()
 	{
+		FileSystem.createDirectory("./bin");
+		FileSystem.createDirectory("./bin/dcigraphs");
+		var file = File.write("./bin/dcigraphs/" + title + ".htm", false);
+
 		var builder = new StringBuf();
 		var lastCallMatch = ~/: \S/;
 		
@@ -115,7 +122,10 @@ class DiagramGenerator
 			builder.add(output.join("\n") + "\nend\n\n");
 		}
 		
-		return builder.toString();
+		file.writeString('<!DOCTYPE html>\n<html><head><title>$title</title></head><body><div class=wsd wsd_style="roundgreen"><pre>\n');
+		file.writeString(builder.toString());
+		file.writeString("</pre></div><script src='http://www.websequencediagrams.com/service.js'></script></body></html>");
+		file.close();
 	}
 	
 	private function recurseRoleMethod(current : RoleMethod, stack : GenericStack<RoleMethod>, activeRoles : Map<String, Bool>, builder : StringBuf)

@@ -4,7 +4,7 @@
   "license": "MIT",
   "tags": ["cross", "dci"],
   "description": "A DCI library for Haxe",
-  "version": "0.4.1",
-  "releasenote": "Made sequence diagram generation optional instead of automatic. See README.",
+  "version": "0.4.2",
+  "releasenote": "Role methods without block now works properly.",
   "contributors": ["ciscoheat"]
 }

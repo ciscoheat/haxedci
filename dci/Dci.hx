@@ -1,10 +1,6 @@
 package dci;
-import haxe.crypto.Adler32;
 import haxe.macro.Expr;
 import haxe.macro.Context;
-import sys.FileSystem;
-import sys.io.File;
-import sys.io.FileOutput;
 
 using haxe.macro.ExprTools;
 
@@ -58,6 +54,8 @@ class Dci
 		// First pass: Add Role methods and create the RoleInterfaces map.
 		for (field in fields)
 		{
+			if (field.name == "testNoBlock") trace(field);
+			
 			addRoleMethods(field);
 		}
 
@@ -68,9 +66,6 @@ class Dci
 		}
 		
 		#if dcigraphs
-		FileSystem.createDirectory("./bin");
-		FileSystem.createDirectory("./bin/dcigraphs");
-		var file = File.write("./bin/dcigraphs/" + Context.getLocalClass() + ".htm", false);
 		var diagram = new DiagramGenerator(Context.getLocalClass().toString());
 		#else
 		var diagram = null;
@@ -103,18 +98,14 @@ class Dci
 		}
 		
 		#if dcigraphs
-		var title = Context.getLocalClass();
-		file.writeString('<!DOCTYPE html>\n<html><head><title>$title</title></head><body><div class=wsd wsd_style="roundgreen"><pre>\n');
-		file.writeString(diagram.generateSequenceDiagram());
-		file.writeString("</pre></div><script src='http://www.websequencediagrams.com/service.js'></script></body></html>");
-		file.close();
+		diagram.generateSequenceDiagram();
 		#end
 		
 		for (roleName in roleMethods.keys())
 		{
 			for (roleMethod in roleMethods[roleName])
 			{
-				addSelfToMethod(roleMethod, roleName, roleMethod.expr.pos);
+				addSelfToMethod(roleMethod, roleName);
 			}
 		}
 		
@@ -400,7 +391,7 @@ class Dci
 							switch(expr.expr)
 							{
 								case EFunction(name, f):
-									addSelfToMethod(f, field.name, f.expr.pos);
+									addSelfToMethod(f, field.name);
 									
 								case _:
 							}
@@ -482,7 +473,7 @@ class Dci
 		}					
 	}
 	
-	function addSelfToMethod(f : Function, roleName : String, pos : Position)
+	function addSelfToMethod(f : Function, roleName : String)
 	{
 		var type = roleInterfaces.exists(roleName) ? roleInterfaces[roleName] : null;
 				
@@ -492,6 +483,8 @@ class Dci
 				exprs.unshift(macro var $SELF = this.$roleName);
 				exprs.unshift(macro var $CONTEXT = this);
 			case _:
+				f.expr = {expr: EBlock([f.expr]), pos: f.expr.pos};
+				addSelfToMethod(f, roleName);
 		}
 	}
 }
