@@ -4,7 +4,7 @@
   "license": "MIT",
   "tags": ["cross", "dci"],
   "description": "A DCI library for Haxe",
-  "version": "0.4.2",
-  "releasenote": "Role methods without block now works properly.",
+  "version": "0.5.0",
+  "releasenote": "Roles are now forced to be bound within a single Context method.",
   "contributors": ["ciscoheat"]
 }

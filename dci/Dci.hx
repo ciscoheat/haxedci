@@ -29,15 +29,20 @@ class Dci
 	private static var ROLEINTERFACE = "roleInterface";
 
 	var roleFields : Array<Field>;
+	var roleIdentifiers : Map<String, Bool>;
+	
 	var nonRoleFields : Array<Field>;
 	var roleMethodNames : RoleNameMap;
 	var roleMethods : RoleMap;
 	var roleInterfaceList : RoleInterfaceList;
 	var roleInterfaces : RoleInterfaces;
+	var roleBindMethod : Function;
 	
 	public function new()
 	{
 		roleFields = [];
+		roleIdentifiers = new Map<String, Bool>();
+		
 		nonRoleFields = [];
 		roleMethodNames = new RoleNameMap();
 		roleMethods = new RoleMap();
@@ -46,7 +51,7 @@ class Dci
 	}
 	
 	public function execute() : Array<Field>
-	{		
+	{	
 		var fields = Context.getBuildFields();
 
 		//trace("=== Context: " + Context.getLocalClass());
@@ -71,6 +76,9 @@ class Dci
 		var diagram = null;
 		#end
 		
+		for (field in roleFields)
+			roleIdentifiers.set(field.name, true);
+		
 		// Third pass: Replace function calls with Role method calls, where appropriate		
 		for (field in fields)
 		{
@@ -78,6 +86,7 @@ class Dci
 			
 			var ex : Expr;
 			var functionName : String = null;
+			var functionRef : Function = null;
 			
 			switch(field.kind)
 			{
@@ -86,12 +95,13 @@ class Dci
 				case FFun(f): 
 					ex = f.expr;
 					functionName = field.name;
+					functionRef = f;
 				case FProp(_, _, _, e): 
 					ex = e;
 			}
 			
 			if (ex != null)
-				ex.iter(function(e) { replaceRoleMethodCalls(e, isRole ? field.name : null, functionName, diagram); } );
+				ex.iter(function(e) { replaceRoleMethodCalls(e, isRole ? field.name : null, functionName, functionRef, diagram); } );
 				
 			if (!isRole)
 				nonRoleFields.push(field);
@@ -116,17 +126,45 @@ class Dci
 	{
 		return Lambda.exists(field.meta, function(m) { return m.name == "role"; } );
 	}
-
+	
 	// Replace Role method calls with the transformed version.
 	// If roleName is null, we're not in a RoleMethod.
 	// If methodName is null, we're not in a method (rather a var or property)
-	function replaceRoleMethodCalls(e : Expr, roleName : String, methodName : String, generator : DiagramGenerator)
+	private var lastRoleRef : Expr;
+	function replaceRoleMethodCalls(e : Expr, roleName : String, methodName : String, methodRef : Function, generator : DiagramGenerator)
 	{
 		switch(e.expr)
 		{
+			case EBinop(op, e1, e2):
+				switch(op)
+				{
+					case OpAssign:
+						var fieldArray = extractField(e1, roleName);
+						if (fieldArray[0] == "this") fieldArray.shift();
+						
+						if (fieldArray.length == 1 && roleIdentifiers.exists(fieldArray[0]))
+						{
+							//haxe.macro.Context.warning("Binding role " + fieldArray[0] + " in " + methodName, e.pos);
+
+							if (roleBindMethod == null)
+							{
+								roleBindMethod = methodRef;
+							}
+							else if (roleBindMethod != methodRef)
+							{
+								Context.warning('Last Role assignment outside current method', lastRoleRef.pos);
+								Context.error('All Roles in a Context must be assigned in the same method.', e.pos);
+							}
+							
+							lastRoleRef = e;
+						}
+						
+					case _:
+				}
+			
 			case EFunction(name, f):
 				// Note that anonymous functions will have name == null, then keep previous name.
-				replaceRoleMethodCalls(f.expr, roleName, name != null ? name : methodName, generator);
+				replaceRoleMethodCalls(f.expr, roleName, name != null ? name : methodName, methodRef, generator);
 				return;
 			
 			case EField(e3, fd):
@@ -183,7 +221,7 @@ class Dci
 			case _: 
 		}
 		
-		e.iter(function(e) { replaceRoleMethodCalls(e, roleName, methodName, generator); });
+		e.iter(function(e) { replaceRoleMethodCalls(e, roleName, methodName, methodRef, generator); });
 	}
 
 	// Extract the field to an array. this.test.length = ['this', 'test', 'length']
