@@ -1,4 +1,4 @@
-package dci;
+package haxedci;
 import sys.FileSystem;
 import sys.io.File;
 import sys.io.FileOutput;

@@ -1,4 +1,4 @@
-package dci;
+package haxedci;
 
-@:autoBuild(dci.Dci.context()) interface Context
+@:autoBuild(haxedci.Dci.context()) interface Context
 {}

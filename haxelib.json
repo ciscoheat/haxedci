@@ -4,7 +4,7 @@
   "license": "MIT",
   "tags": ["cross", "dci"],
   "description": "A DCI library for Haxe",
-  "version": "0.5.0",
-  "releasenote": "Roles are now forced to be bound within a single Context method.",
+  "version": "0.6.0",
+  "releasenote": "Package renamed to haxedci, please update your references!",
   "contributors": ["ciscoheat"]
 }
