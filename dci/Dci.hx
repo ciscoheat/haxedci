@@ -273,6 +273,14 @@ class Dci
 	{
 		if (Context.defined("display") && roleInterfaceList.exists(fieldName))
 		{
+			// Can only extend classes and structures, so test if type is one of those.
+			var realType = haxe.macro.Context.getType(type.name);
+			switch(realType)
+			{
+				case TMono(_), TLazy(_), TFun(_, _), TEnum(_, _), TDynamic(_), TAbstract(_, _):
+					return TAnonymous(roleInterfaceList[fieldName]);
+				case _:
+			}
 			// Creates a compile error if RoleInterface field exists on the type, which is useful.
 			return TExtend(type, roleInterfaceList[fieldName]);
 		}
