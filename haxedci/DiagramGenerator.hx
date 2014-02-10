@@ -59,7 +59,7 @@ class DiagramGenerator
 	}
 	
 	public function addInteraction(name : String, role : String, method : String)
-	{	
+	{
 		interactions.push(addRoleMethodCall(contextKey, name, role, method));
 	}
 
@@ -89,11 +89,14 @@ class DiagramGenerator
 
 		var builder = new StringBuf();
 		var lastCallMatch = ~/: \S/;
+		var addedMethods = new Map<String, Bool>();
 		
 		builder.add("title " + title + "\n\n");
 		
 		for (method in interactions)
 		{
+			if (addedMethods.exists(method.toString())) continue;
+			
 			var interactBuilder = new StringBuf();
 			var stack = new GenericStack<RoleMethod>();
 			var active = new Map<String, Bool>();
@@ -116,10 +119,12 @@ class DiagramGenerator
 						
 					break;
 				}
-			}
-			
+			}			
 			output = output.slice(0, i);
+			
 			builder.add(output.join("\n") + "\nend\n\n");
+			
+			addedMethods.set(method.toString(), true);
 		}
 		
 		file.writeString('<!DOCTYPE html>\n<html><head><title>$title</title></head><body><div class=wsd wsd_style="roundgreen"><pre>\n');
