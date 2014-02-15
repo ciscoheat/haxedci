@@ -327,11 +327,11 @@ class Dci
 			switch(realType)
 			{
 				case TMono(_), TLazy(_), TFun(_, _), TEnum(_, _), TDynamic(_), TAbstract(_, _):
-					return TAnonymous(roleInterfaceList(role));
+					return TAnonymous(roleMethodsList(role));
 				case _:
 			}
 			// Creates a compile error if RoleInterface field exists on the type, which is useful.			
-			return TExtend(type, roleInterfaceList(role));
+			return TExtend(type, roleMethodsList(role));
 		}
 
 		return TPath(type);
@@ -352,17 +352,18 @@ class Dci
 					Context.error('The RoleInterface field "' + hash[method].name + '" has the same name as a RoleMethod.', hash[method].pos);
 			}
 				
-			return TAnonymous(fields.concat(roleInterfaceList(role)));
+			return TAnonymous(fields.concat(roleMethodsList(role)));
 		}
 
 		return TAnonymous(fields);
 	}
 	
-	function roleInterfaceList(role : Role) : Array<Field>
+	function roleMethodsList(role : Role) : Array<Field>
 	{
 		var output = new Array<Field>();
-		for (m in role.methods)
+		for (roleName in role.methods.keys())
 		{
+			var m = role.methods.get(roleName);
 			switch(m.kind)
 			{
 				case FFun(f):
@@ -377,11 +378,11 @@ class Dci
 							args: f.args
 						}
 						
-						output.push(contextField(FFun(functionDef), m.name, [], f.expr.pos));
+						output.push(contextField(FFun(functionDef), roleName, [], f.expr.pos));
 					}
 					else
 					{
-						//haxe.macro.Context.warning("The RoleMethod " + field.name + "." + name + " has no return type, add it if you need autocompletion.", f.expr.pos);
+						//haxe.macro.Context.warning("The RoleMethod " + roleName + "." + m.name + " has no return type, add it if you need autocompletion.", f.expr.pos);
 					}
 				case _:
 					Context.error("Incorrect RoleMethod definition: Must be a function.", m.pos);
@@ -461,7 +462,7 @@ class Dci
 														found = true;
 														
 													case TPath(p):
-														//trace("Adding Role " + field.name + " with a Type as RoleInterface");
+														//trace("Adding Role " + field.name + " with Type as RoleInterface: " + p);
 														role.roleInterface = mergeTypeAndRoleInterface(role, p);
 														found = true;
 														
