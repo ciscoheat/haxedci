@@ -4,7 +4,7 @@
   "license": "MIT",
   "tags": ["cross", "dci"],
   "description": "A DCI library for Haxe",
-  "version": "0.6.1",
-  "releasenote": "Macro warning if a Role is unbound in a Context.",
+  "version": "0.7.0",
+  "releasenote": "Dependency graphs added when compiling with -D dcigraphs.",
   "contributors": ["ciscoheat"]
 }

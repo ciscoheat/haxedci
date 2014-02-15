@@ -1,10 +1,11 @@
 package haxedci;
-import haxe.macro.Expr;
-import haxe.macro.Context;
-
-using haxe.macro.ExprTools;
 
 #if macro
+import haxe.macro.Expr;
+import haxe.macro.Context;
+import haxedci.DiagramGenerator.RoleMethods;
+using haxe.macro.ExprTools;
+
 // A map for detecting role names. Role => [RoleMethod, ...]
 private typedef RoleNameMap = Map<String, Array<String>>;
 
@@ -17,6 +18,30 @@ private typedef RoleInterfaceList = Map<String, Array<Field>>;
 // The final RoleInterface type, an anonymous type with or without an extension.
 private typedef RoleInterfaces = Map<String, ComplexType>;
 
+private class Role
+{
+	public var field : Field;
+	public var bound : Position;
+	
+	// RoleMethod name -> Field (the field name is rewritten so it cannot be used)
+	public var methods : Map<String, Field>;
+	public var roleInterface(null, set) : ComplexType;
+	
+	function set_roleInterface(t : ComplexType) 
+	{
+		field.kind = FVar(t);
+		return t;
+	}
+	
+	public function new(field : Field)
+	{
+		this.field = field;
+		this.methods = new Map<String, Field>();
+	}
+}
+
+private typedef Roles = Map<String, Role>;
+
 class Dci
 {
 	@macro public static function context() : Array<Field>
@@ -27,49 +52,27 @@ class Dci
 	private static var CONTEXT = "context";
 	private static var SELF = "self";
 	private static var ROLEINTERFACE = "roleInterface";
-
-	var roleFields : Array<Field>;
-	var roleIdentifiers : Map<String, Position>;
 	
-	var nonRoleFields : Array<Field>;
-	var roleMethodNames : RoleNameMap;
-	var roleMethods : RoleMap;
-	var roleInterfaceList : RoleInterfaceList;
-	var roleInterfaces : RoleInterfaces;
-	var roleBindMethod : Function;
+	var roles : Roles;
 	
 	public function new()
 	{
-		roleFields = [];
-		roleIdentifiers = new Map<String, Position>();
-		
-		nonRoleFields = [];
-		roleMethodNames = new RoleNameMap();
-		roleMethods = new RoleMap();
-		roleInterfaceList = new RoleInterfaceList();
-		roleInterfaces = new RoleInterfaces();
+		roles = new Roles();		
 	}
 	
 	public function execute() : Array<Field>
 	{	
 		var fields = Context.getBuildFields();
+		var nonRoleFields = [];
 
-		//trace("=== Context: " + Context.getLocalClass());
+		//trace("======================== Context: " + Context.getLocalClass());
 
-		// First pass: Add Role methods and create the RoleInterfaces map.
-		for (field in fields)
-		{
-			addRoleMethods(field);
-		}
-
-		// Second pass: Add Roles.
 		for (field in fields)
 		{
 			if (hasRole(field))
-			{
-				roleIdentifiers.set(field.name, field.pos);
-				addRole(field);
-			}
+				addRole(field);				
+			else
+				nonRoleFields.push(field);
 		}
 		
 		#if dcigraphs
@@ -78,7 +81,7 @@ class Dci
 		var diagram = null;
 		#end
 		
-		// Third pass: Replace function calls with Role method calls, where appropriate		
+		// Replace function calls with Role method calls, where appropriate
 		for (field in fields)
 		{
 			var isRole = hasRole(field);
@@ -100,33 +103,47 @@ class Dci
 			}
 			
 			if (ex != null)
+			{
+				//trace("----- Field: " + field.name);
 				ex.iter(function(e) { replaceRoleMethodCalls(e, isRole ? field.name : null, functionName, functionRef, diagram); } );
-				
-			if (!isRole)
-				nonRoleFields.push(field);
+			}				
 		}
 		
 		// Test if all roles were bound.
-		for (roleName in roleIdentifiers.keys())
+		for (roleName in roles.keys())
 		{
-			var fieldBound = roleIdentifiers.get(roleName);
-			if (fieldBound != null)
-				haxe.macro.Context.warning("Role \"" + roleName + "\" isn't bound in this Context.", fieldBound);
+			if (roles.get(roleName).bound == null)
+				Context.warning("Role \"" + roleName + "\" isn't bound in this Context.", roles.get(roleName).field.pos);
 		}
 		
 		#if dcigraphs
-		diagram.generateSequenceDiagram();
+		diagram.generateSequenceDiagrams();
+		diagram.generateDependencyGraphs();
 		#end
 		
-		for (roleName in roleMethods.keys())
+		for (roleName in roles.keys())
 		{
-			for (roleMethod in roleMethods[roleName])
+			for (roleMethod in roles.get(roleName).methods)
 			{
-				addSelfToMethod(roleMethod, roleName);
+				switch(roleMethod.kind)
+				{
+					case FFun(f):
+						addSelfToMethod(f, roleName);
+						
+					case _:						
+						Context.error('Incorrect RoleMethod definition.', roleMethod.pos);
+				}				
 			}
 		}
 		
-		return roleFields.concat(nonRoleFields);
+		for (role in roles)
+		{
+			nonRoleFields.push(role.field);
+			for (method in role.methods)
+				nonRoleFields.push(method);
+		}
+		
+		return nonRoleFields;
 	}
 
 	static function hasRole(field : Field)
@@ -137,7 +154,8 @@ class Dci
 	// Replace Role method calls with the transformed version.
 	// If roleName is null, we're not in a RoleMethod.
 	// If methodName is null, we're not in a method (rather a var or property)
-	private var lastRoleRef : Expr;
+	var lastRoleRef : Expr;
+	var roleBindMethod : Function;
 	function replaceRoleMethodCalls(e : Expr, roleName : String, methodName : String, methodRef : Function, generator : DiagramGenerator)
 	{
 		switch(e.expr)
@@ -149,10 +167,10 @@ class Dci
 						var fieldArray = extractField(e1, roleName);
 						if (fieldArray[0] == "this") fieldArray.shift();
 						
-						if (fieldArray.length == 1 && roleIdentifiers.exists(fieldArray[0]))
+						if (fieldArray.length == 1 && roles.exists(fieldArray[0]))
 						{
-							// Set to null for testing if role wasn't bound later.
-							roleIdentifiers.set(fieldArray[0], null);
+							// Set where the Role was bound in the Context.
+							roles.get(fieldArray[0]).bound = e.pos;
 							
 							//haxe.macro.Context.warning("Binding role " + fieldArray[0] + " in " + methodName, e.pos);
 
@@ -174,18 +192,23 @@ class Dci
 			
 			case EFunction(name, f):
 				// Note that anonymous functions will have name == null, then keep previous name.
-				replaceRoleMethodCalls(f.expr, roleName, name != null ? name : methodName, methodRef, generator);
+				var mName = name != null ? name : methodName;
+				//if(name != null) trace("- Function: " + roleName + "." + mName);
+				replaceRoleMethodCalls(f.expr, roleName, mName, methodRef, generator);
 				return;
 			
 			case EField(e3, fd):
 				var fieldArray = extractField(e, roleName);
 				if (fieldArray != null)
 				{
+					// Rewriting [this, console, newline] to [this, console_newline]
+					//trace(fieldArray);
+					
 					var newArray = [];
 					var skip = false;
 					var length = fieldArray.length;
 					
-					for (i in 0 ... length)
+					for (i in 0...length)
 					{
 						if (skip)
 						{
@@ -196,34 +219,50 @@ class Dci
 						// Test if we're past the end of array (no need to check last field),
 						// or if a Role is matching the field.
 						var field = fieldArray[i];
-						if (i > length-2 || !roleMethodNames.exists(field) || !Lambda.has(roleMethodNames[field], fieldArray[i + 1]))
-						{
-							newArray.push(field);
-							continue;
-						}
 						
-						var roleMethod = roleMethodName(field, fieldArray[i + 1]);
-						
-						if (generator != null)
+						if (generator != null && roles.exists(field))
 						{
-							if (roleName == null && methodName != null)
+							if (roleName != null)
 							{
-								generator.addInteraction(methodName, field, fieldArray[i + 1]);
+								generator.addDependency(roleName, field);
 							}
-							else if (roleName != null && methodName != null)
+							else if(i < length-1 && roles.get(field).methods.exists(fieldArray[i+1]))
 							{
-								generator.addRoleMethodCall(roleName, methodName, field, fieldArray[i + 1]);
+								generator.addDependency(roleName, field);					
 							}
 						}
 
-						newArray.push(roleMethod);
-						skip = true; // Skip next field since it's now a part of the Role method call.
+						if (i > length-2 || !roles.exists(field) || !roles.get(field).methods.exists(fieldArray[i+1]))
+						{
+							newArray.push(field);
+						}
+						else					
+						{							
+							var roleMethod = roleMethodName(field, fieldArray[i + 1]);
+							newArray.push(roleMethod);
+							skip = true; // Skip next field since it's now a part of the Role method call.
+
+							//trace("RoleMethod call: " + roleMethod + " at " + e3.pos);
+							//trace(roleName, methodName, field, fieldArray[i + 1]);
+
+							// Add diagram generation data
+							if (generator != null)
+							{								
+								if (roleName == null && methodName != null)
+								{
+									generator.addInteraction(methodName, field, fieldArray[i + 1]);
+								}
+								else if (roleName != null && methodName != null)
+								{
+									generator.addRoleMethodCall(roleName, methodName, field, fieldArray[i + 1]);
+								}
+							}
+						}
 					}
 					
 					if (fieldArray.length != newArray.length)
 					{
-						//trace("Role method call: " + newArray.join(".") + " at " + e.pos);
-						e.expr = buildField(newArray, newArray.length - 1, e.pos);
+						e.expr = buildField(newArray, newArray.length - 1, e3.pos);						
 						return;
 					}					
 				}
@@ -279,56 +318,89 @@ class Dci
 	// Special trick for autocompletion: At runtime, only objects that fulfill the RoleInterface
 	// should be bound to a Role. When compiling however, it is convenient to also have the RoleMethods
 	// displayed. Therefore, test if we're in autocomplete mode, add the RoleMethods if so.
-	function mergeTypeAndRoleInterface(fieldName : String, type : TypePath) : ComplexType
+	function mergeTypeAndRoleInterface(role : Role, type : TypePath) : ComplexType
 	{
-		if (Context.defined("display") && roleInterfaceList.exists(fieldName))
+		if (Context.defined("display"))
 		{
 			// Can only extend classes and structures, so test if type is one of those.
 			var realType = haxe.macro.Context.getType(type.name);
 			switch(realType)
 			{
 				case TMono(_), TLazy(_), TFun(_, _), TEnum(_, _), TDynamic(_), TAbstract(_, _):
-					return TAnonymous(roleInterfaceList[fieldName]);
+					return TAnonymous(roleInterfaceList(role));
 				case _:
 			}
-			// Creates a compile error if RoleInterface field exists on the type, which is useful.
-			return TExtend(type, roleInterfaceList[fieldName]);
+			// Creates a compile error if RoleInterface field exists on the type, which is useful.			
+			return TExtend(type, roleInterfaceList(role));
 		}
 
 		return TPath(type);
 	}
 
 	// Same trick here as above.
-	function mergeAnonymousInterfaces(fieldName : String, fields : Array<Field>) : ComplexType
+	function mergeAnonymousInterfaces(role : Role, fields : Array<Field>) : ComplexType
 	{
-		if (Context.defined("display") && roleInterfaceList.exists(fieldName))
+		if (Context.defined("display"))
 		{
 			// Test if there are RoleInterface/Method name collisions
 			var hash = new Map<String, Field>();
 			for (field in fields) hash[field.name] = field;
 					
-			for (method in roleMethodNames[fieldName])
+			for (method in role.methods.keys())
 			{
 				if (hash.exists(method))
 					Context.error('The RoleInterface field "' + hash[method].name + '" has the same name as a RoleMethod.', hash[method].pos);
 			}
 				
-			return TAnonymous(fields.concat(roleInterfaceList[fieldName]));
+			return TAnonymous(fields.concat(roleInterfaceList(role)));
 		}
 
 		return TAnonymous(fields);
 	}
 	
-	//function mergedRoleInterface(fieldName : String
-
+	function roleInterfaceList(role : Role) : Array<Field>
+	{
+		var output = new Array<Field>();
+		for (m in role.methods)
+		{
+			switch(m.kind)
+			{
+				case FFun(f):
+					if (f.ret != null)
+					{
+						// There cannot be a body for the function because we're only creating a field definition,
+						// so a new definition needs to be created.
+						var functionDef = {
+							ret: f.ret,
+							params: f.params,
+							expr: null,
+							args: f.args
+						}
+						
+						output.push(contextField(FFun(functionDef), m.name, [], f.expr.pos));
+					}
+					else
+					{
+						//haxe.macro.Context.warning("The RoleMethod " + field.name + "." + name + " has no return type, add it if you need autocompletion.", f.expr.pos);
+					}
+				case _:
+					Context.error("Incorrect RoleMethod definition: Must be a function.", m.pos);
+			}
+		}
+		return output;
+	}
+	
+	// Add a Role object to roles.
 	function addRole(field : Field)
 	{
 		if (field.name == SELF)
 			Context.error('A Role cannot be named "$SELF", it is used as an accessor within RoleMethods.', field.pos);
-		else if (field.name == "Context") // Reserved for sequence diagrams.
+		else if (field.name == "Context") // Reserved for diagrams.
 			Context.error('A Role cannot be named "Context".', field.pos);
 			
 		var error = function(p) { Context.error("Incorrect Role definition: Must be a var.", p); };
+		
+		var role = new Role(contextField(null, field.name, [APrivate], field.pos));
 		
 		switch(field.kind)
 		{
@@ -341,21 +413,37 @@ class Dci
 					{
 						case TPath(p): 
 							//trace("Adding Role " + field.name + " with only a type");
-							var fieldType = mergeTypeAndRoleInterface(field.name, p);
-							roleFields.push(contextField(FVar(fieldType), field.name, [APrivate], field.pos));
-							roleInterfaces[field.name] = fieldType;
-							return;
+							role.roleInterface = mergeTypeAndRoleInterface(role, p);
 						case _: error(field.pos);
 					}
 				}
 				else
-				{
-					var found = false;
-					
+				{					
 					switch(e.expr)
 					{
-						// The role is defined using a block, so search for a RoleInterface.
+						// The Role is defined using a block.
 						case EBlock(exprs):
+							
+							// First, find and extract the RoleMethods
+							for (expr in exprs)
+							{
+								switch(expr.expr)
+								{
+									case EFunction(name, f): 
+										//trace("Adding RoleMethod " + name + " for Role " + field.name);
+										var methodName = roleMethodName(field.name, name);
+										var noCompletion = { pos: f.expr.pos, params: [], name: ":noCompletion" };
+										var roleField = contextField(FFun(f), methodName, [APrivate], f.expr.pos, [noCompletion]);
+										
+										role.methods.set(name, roleField);
+										
+									case _:
+								}
+							}
+							
+							var found = false;
+							
+							// Then create the Role with its RoleInterface based on the RoleMethods.
 							for (expr in exprs)
 							{
 								switch(expr.expr)
@@ -369,16 +457,12 @@ class Dci
 												{
 													case TAnonymous(fields):
 														//trace("Adding Role " + field.name + " with RoleInterface");
-														var fieldType = mergeAnonymousInterfaces(field.name, fields);
-														roleFields.push(contextField(FVar(fieldType), field.name, [APrivate], expr.pos));
-														roleInterfaces[field.name] = fieldType;
+														role.roleInterface = mergeAnonymousInterfaces(role, fields);
 														found = true;
 														
 													case TPath(p):
-														//trace("Adding Role: " + field.name + " with simple RoleInterface");
-														var fieldType = mergeTypeAndRoleInterface(field.name, p);
-														roleFields.push(contextField(FVar(fieldType), field.name, [APrivate], expr.pos));
-														roleInterfaces[field.name] = fieldType;
+														//trace("Adding Role " + field.name + " with a Type as RoleInterface");
+														role.roleInterface = mergeTypeAndRoleInterface(role, p);
 														found = true;
 														
 													case _: Context.error("RoleInterfaces must be defined as a Type or with class notation according to http://haxe.org/manual/struct#class-notation", expr.pos);
@@ -397,7 +481,7 @@ class Dci
 							if (!found)
 							{
 								//trace("No RoleInterface found, adding Role " + field.name + " as Dynamic");
-								roleFields.push(contextField(FVar(TPath( { name: 'Dynamic', pack: [], params: [] } ), null), field.name, [APrivate], e.pos));
+								role.roleInterface = TPath({ name: 'Dynamic', pack: [], params: [] });
 							}
 							
 						case _: error(e.pos);
@@ -406,6 +490,8 @@ class Dci
 					
 			case _: error(field.pos);
 		}		
+		
+		roles.set(field.name, role);
 	}
 	
 	private static function contextField(kind : FieldType, name : String, access : Array<Access>, pos : Position, meta : Array<MetadataEntry> = null) : Field
@@ -431,7 +517,7 @@ class Dci
 	
 	function addSelfToMethods(field : Field)
 	{
-		var errorMsg = "Incorrect Role method definition: Must be a block or a Type.";
+		var errorMsg = "Incorrect RoleMethod definition: Must be a block or a Type.";
 		var error = function(p) { Context.error(errorMsg, p); };
 		
 		switch(field.kind)
@@ -460,79 +546,8 @@ class Dci
 		}		
 	}
 	
-	function addRoleMethods(field : Field)
-	{
-		if (!hasRole(field)) return;
-		
-		var errorMsg = "Incorrect Role method definition: Must be a block or a Type.";
-		var error = function(p) { Context.error(errorMsg, p); };
-		
-		switch(field.kind)
-		{
-			case FVar(t, e): 
-				if (t != null) return;
-
-				switch(e.expr)
-				{
-					case EBlock(exprs):
-						for (expr in exprs)
-						{
-							switch(expr.expr)
-							{
-								case EFunction(name, f): 
-									var methodName = roleMethodName(field.name, name);
-									var noCompletion = { pos: f.expr.pos, params: [], name: ":noCompletion" };
-									//trace("Adding role method: " + methodName);
-									roleFields.push(contextField(FFun(f), methodName, [APrivate], f.expr.pos, [noCompletion]));
-																		
-									// Store the RoleMethod for usage in next passes
-									if (!roleMethodNames.exists(field.name))
-									{
-										roleMethodNames.set(field.name, []);
-										roleMethods.set(field.name, []);
-									}
-
-									roleMethodNames[field.name].push(name);
-									roleMethods[field.name].push(f);
-									
-									// Autocompletion can only display when the return type is known, 
-									// so only define the RoleInterface if it is set.
-									if (f.ret != null)
-									{
-										if (!roleInterfaceList.exists(field.name))
-											roleInterfaceList.set(field.name, []);
-										
-										// There cannot be a body for the function because we're only creating a field definition,
-										// so a new definition needs to be created.
-										var functionDef = {
-											ret: f.ret,
-											params: f.params,
-											expr: null,
-											args: f.args
-										}
-										
-										roleInterfaceList[field.name].push(contextField(FFun(functionDef), name, [], f.expr.pos));
-									}
-									else
-									{
-										//haxe.macro.Context.warning("The RoleMethod " + field.name + "." + name + " has no return type, add it if you need autocompletion.", f.expr.pos);
-									}
-									
-								case _:
-							}
-						}
-						
-					case _: error(e.pos);
-				}
-					
-			case _: error(field.pos);
-		}					
-	}
-	
 	function addSelfToMethod(f : Function, roleName : String)
 	{
-		var type = roleInterfaces.exists(roleName) ? roleInterfaces[roleName] : null;
-				
 		switch(f.expr.expr)
 		{
 			case EBlock(exprs): 
