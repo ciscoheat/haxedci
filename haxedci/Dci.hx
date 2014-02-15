@@ -29,7 +29,7 @@ class Dci
 	private static var ROLEINTERFACE = "roleInterface";
 
 	var roleFields : Array<Field>;
-	var roleIdentifiers : Map<String, Bool>;
+	var roleIdentifiers : Map<String, Position>;
 	
 	var nonRoleFields : Array<Field>;
 	var roleMethodNames : RoleNameMap;
@@ -41,7 +41,7 @@ class Dci
 	public function new()
 	{
 		roleFields = [];
-		roleIdentifiers = new Map<String, Bool>();
+		roleIdentifiers = new Map<String, Position>();
 		
 		nonRoleFields = [];
 		roleMethodNames = new RoleNameMap();
@@ -59,15 +59,17 @@ class Dci
 		// First pass: Add Role methods and create the RoleInterfaces map.
 		for (field in fields)
 		{
-			if (field.name == "testNoBlock") trace(field);
-			
 			addRoleMethods(field);
 		}
 
 		// Second pass: Add Roles.
 		for (field in fields)
 		{
-			if(hasRole(field)) addRole(field);
+			if (hasRole(field))
+			{
+				roleIdentifiers.set(field.name, field.pos);
+				addRole(field);
+			}
 		}
 		
 		#if dcigraphs
@@ -75,9 +77,6 @@ class Dci
 		#else
 		var diagram = null;
 		#end
-		
-		for (field in roleFields)
-			roleIdentifiers.set(field.name, true);
 		
 		// Third pass: Replace function calls with Role method calls, where appropriate		
 		for (field in fields)
@@ -105,6 +104,14 @@ class Dci
 				
 			if (!isRole)
 				nonRoleFields.push(field);
+		}
+		
+		// Test if all roles were bound.
+		for (roleName in roleIdentifiers.keys())
+		{
+			var fieldBound = roleIdentifiers.get(roleName);
+			if (fieldBound != null)
+				haxe.macro.Context.warning("Role \"" + roleName + "\" isn't bound in this Context.", fieldBound);
 		}
 		
 		#if dcigraphs
@@ -144,6 +151,9 @@ class Dci
 						
 						if (fieldArray.length == 1 && roleIdentifiers.exists(fieldArray[0]))
 						{
+							// Set to null for testing if role wasn't bound later.
+							roleIdentifiers.set(fieldArray[0], null);
+							
 							//haxe.macro.Context.warning("Binding role " + fieldArray[0] + " in " + methodName, e.pos);
 
 							if (roleBindMethod == null)
