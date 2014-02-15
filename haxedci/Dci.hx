@@ -6,18 +6,6 @@ import haxe.macro.Context;
 import haxedci.DiagramGenerator.RoleMethods;
 using haxe.macro.ExprTools;
 
-// A map for detecting role names. Role => [RoleMethod, ...]
-private typedef RoleNameMap = Map<String, Array<String>>;
-
-// A map for the RoleMethods, used when adding 'self'.
-private typedef RoleMap = Map<String, Array<Function>>;
-
-// A map for the types of the RoleMethod functions.
-private typedef RoleInterfaceList = Map<String, Array<Field>>;
-
-// The final RoleInterface type, an anonymous type with or without an extension.
-private typedef RoleInterfaces = Map<String, ComplexType>;
-
 private class Role
 {
 	public var field : Field;
@@ -113,7 +101,7 @@ class Dci
 		for (roleName in roles.keys())
 		{
 			if (roles.get(roleName).bound == null)
-				Context.warning("Role \"" + roleName + "\" isn't bound in this Context.", roles.get(roleName).field.pos);
+				Context.warning("Role " + roleName + " isn't bound in this Context.", roles.get(roleName).field.pos);
 		}
 		
 		#if dcigraphs
