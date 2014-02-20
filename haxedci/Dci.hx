@@ -8,21 +8,16 @@ using haxe.macro.ExprTools;
 
 private class Role
 {
+	// RoleMethod name -> Field (field.name is rewritten so it cannot be used directly)
+	public var methods : Map<String, Field>;
+	
 	public var field : Field;
 	public var bound : Position;
-	
-	// RoleMethod name -> Field (the field name is rewritten so it cannot be used)
-	public var methods : Map<String, Field>;
-	public var roleInterface(null, set) : ComplexType;
-	
-	function set_roleInterface(t : ComplexType) 
-	{
-		field.kind = FVar(t);
-		return t;
-	}
-	
+		
 	public function new(field : Field)
 	{
+		if (field == null) throw "Null field: " + field;
+		
 		this.field = field;
 		this.methods = new Map<String, Field>();
 	}
@@ -37,9 +32,9 @@ class Dci
 		return new Dci().execute();
 	}
 
-	private static var CONTEXT = "context";
-	private static var SELF = "self";
-	private static var ROLEINTERFACE = "roleInterface";
+	static var CONTEXT = "context";
+	static var SELF = "self";
+	static var ROLEINTERFACE = "roleInterface";
 	
 	var roles : Roles;
 	
@@ -51,7 +46,8 @@ class Dci
 	public function execute() : Array<Field>
 	{	
 		var fields = Context.getBuildFields();
-		var nonRoleFields = [];
+		var outputFields : Array<Field> = [];
+		var diagram : DiagramGenerator;
 
 		//trace("======================== Context: " + Context.getLocalClass());
 
@@ -60,13 +56,12 @@ class Dci
 			if (hasRole(field))
 				addRole(field);				
 			else
-				nonRoleFields.push(field);
+				outputFields.push(field);
 		}
 		
 		#if dcigraphs
-		var diagram = new DiagramGenerator(Context.getLocalClass().toString());
-		#else
-		var diagram = null;
+		if(!Context.defined("display"))
+			diagram = new DiagramGenerator(Context.getLocalClass().toString());
 		#end
 		
 		// Replace function calls with Role method calls, where appropriate
@@ -105,12 +100,17 @@ class Dci
 		}
 		
 		#if dcigraphs
-		diagram.generateSequenceDiagrams();
-		diagram.generateDependencyGraphs();
+		if (!Context.defined("display") && diagram != null)
+		{
+			diagram.generateSequenceDiagrams();
+			diagram.generateDependencyGraphs();
+		}
 		#end
 		
 		for (roleName in roles.keys())
 		{
+			if (roles.get(roleName).methods == null) continue;
+
 			for (roleMethod in roles.get(roleName).methods)
 			{
 				switch(roleMethod.kind)
@@ -126,12 +126,14 @@ class Dci
 		
 		for (role in roles)
 		{
-			nonRoleFields.push(role.field);
+			if (role.methods == null) continue;
+			
+			outputFields.push(role.field);
 			for (method in role.methods)
-				nonRoleFields.push(method);
+				outputFields.push(method);
 		}
 		
-		return nonRoleFields;
+		return outputFields;
 	}
 
 	static function hasRole(field : Field)
@@ -153,26 +155,29 @@ class Dci
 				{
 					case OpAssign:
 						var fieldArray = extractField(e1, roleName);
-						if (fieldArray[0] == "this") fieldArray.shift();
-						
-						if (fieldArray.length == 1 && roles.exists(fieldArray[0]))
+						if (fieldArray != null)
 						{
-							// Set where the Role was bound in the Context.
-							roles.get(fieldArray[0]).bound = e.pos;
+							if (fieldArray[0] == "this") fieldArray.shift();
 							
-							//haxe.macro.Context.warning("Binding role " + fieldArray[0] + " in " + methodName, e.pos);
+							if (fieldArray.length == 1 && roles.exists(fieldArray[0]))
+							{
+								// Set where the Role was bound in the Context.
+								roles.get(fieldArray[0]).bound = e.pos;
+								
+								//haxe.macro.Context.warning("Binding role " + fieldArray[0] + " in " + methodName, e.pos);
 
-							if (roleBindMethod == null)
-							{
-								roleBindMethod = methodRef;
+								if (roleBindMethod == null)
+								{
+									roleBindMethod = methodRef;
+								}
+								else if (roleBindMethod != methodRef)
+								{
+									Context.warning('Last Role assignment outside current method', lastRoleRef.pos);
+									Context.error('All Roles in a Context must be assigned in the same method.', e.pos);
+								}
+								
+								lastRoleRef = e;
 							}
-							else if (roleBindMethod != methodRef)
-							{
-								Context.warning('Last Role assignment outside current method', lastRoleRef.pos);
-								Context.error('All Roles in a Context must be assigned in the same method.', e.pos);
-							}
-							
-							lastRoleRef = e;
 						}
 						
 					case _:
@@ -219,8 +224,8 @@ class Dci
 								generator.addDependency(roleName, field);					
 							}
 						}
-
-						if (i > length-2 || !roles.exists(field) || !roles.get(field).methods.exists(fieldArray[i+1]))
+						
+						if (i > length-2 || !roles.exists(field) || roles.get(field).methods == null || !roles.get(field).methods.exists(fieldArray[i+1]))
 						{
 							newArray.push(field);
 						}
@@ -312,6 +317,7 @@ class Dci
 		{
 			// Can only extend classes and structures, so test if type is one of those.
 			var realType = haxe.macro.Context.getType(type.name);
+			if (realType == null) return TPath(type);
 			switch(realType)
 			{
 				case TMono(_), TLazy(_), TFun(_, _), TEnum(_, _), TDynamic(_), TAbstract(_, _):
@@ -349,6 +355,7 @@ class Dci
 	function roleMethodsList(role : Role) : Array<Field>
 	{
 		var output = new Array<Field>();
+		
 		for (roleName in role.methods.keys())
 		{
 			var m = role.methods.get(roleName);
@@ -368,10 +375,6 @@ class Dci
 						
 						output.push(contextField(FFun(functionDef), roleName, [], f.expr.pos));
 					}
-					else
-					{
-						//haxe.macro.Context.warning("The RoleMethod " + roleName + "." + m.name + " has no return type, add it if you need autocompletion.", f.expr.pos);
-					}
 				case _:
 					Context.error("Incorrect RoleMethod definition: Must be a function.", m.pos);
 			}
@@ -387,8 +390,7 @@ class Dci
 		else if (field.name == "Context") // Reserved for diagrams.
 			Context.error('A Role cannot be named "Context".', field.pos);
 			
-		var error = function(p) { Context.error("Incorrect Role definition: Must be a var.", p); };
-		
+		var error = function(p) { Context.error("Incorrect Role definition: Must be a var.", p); };		
 		var role = new Role(contextField(null, field.name, [APrivate], field.pos));
 		
 		switch(field.kind)
@@ -402,7 +404,7 @@ class Dci
 					{
 						case TPath(p): 
 							//trace("Adding Role " + field.name + " with only a type");
-							role.roleInterface = mergeTypeAndRoleInterface(role, p);
+							role.field.kind = FVar(mergeTypeAndRoleInterface(role, p));
 						case _: error(field.pos);
 					}
 				}
@@ -426,6 +428,9 @@ class Dci
 										
 										role.methods.set(name, roleField);
 										
+										//if(f.ret == null)
+										//	haxe.macro.Context.warning("The RoleMethod " + field.name + "." + name + " has no return type, add it if you need autocompletion.", expr.pos);
+											
 									case _:
 								}
 							}
@@ -446,12 +451,12 @@ class Dci
 												{
 													case TAnonymous(fields):
 														//trace("Adding Role " + field.name + " with RoleInterface");
-														role.roleInterface = mergeAnonymousInterfaces(role, fields);
+														role.field.kind = FVar(mergeAnonymousInterfaces(role, fields));
 														found = true;
 														
 													case TPath(p):
 														//trace("Adding Role " + field.name + " with Type as RoleInterface: " + p);
-														role.roleInterface = mergeTypeAndRoleInterface(role, p);
+														role.field.kind = FVar(mergeTypeAndRoleInterface(role, p));
 														found = true;
 														
 													case _: Context.error("RoleInterfaces must be defined as a Type or with class notation according to http://haxe.org/manual/struct#class-notation", expr.pos);
@@ -469,8 +474,8 @@ class Dci
 							
 							if (!found)
 							{
-								//trace("No RoleInterface found, adding Role " + field.name + " as Dynamic");
-								role.roleInterface = TPath({ name: 'Dynamic', pack: [], params: [] });
+								//trace("No RoleInterface found, adding Role '" + field.name + "' as Dynamic");
+								role.field.kind = FVar(TPath({ name: 'Dynamic', pack: [], params: [] }));
 							}
 							
 						case _: error(e.pos);
