@@ -126,9 +126,11 @@ class Dci
 		
 		for (role in roles)
 		{
-			if (role.methods == null) continue;
+			// Could fix possible autocompletion problem:
+			//if (role.methods == null) continue;
 			
 			outputFields.push(role.field);
+			
 			for (method in role.methods)
 				outputFields.push(method);
 		}
@@ -148,6 +150,8 @@ class Dci
 	var roleBindMethod : Function;
 	function replaceRoleMethodCalls(e : Expr, roleName : String, methodName : String, methodRef : Function, generator : DiagramGenerator)
 	{
+		if (Context.defined("display")) return;
+		
 		switch(e.expr)
 		{
 			case EBinop(op, e1, e2):
@@ -325,7 +329,13 @@ class Dci
 				case _:
 			}
 			// Creates a compile error if RoleInterface field exists on the type, which is useful.			
+			
+			// TExtend changed in 3.1, need this fix when haxe_ver works (gives same value for 3.0.1 right now)
+			#if (haxe_ver >= 3.01)
 			return TExtend(type, roleMethodsList(role));
+			#else
+			return TExtend(type, roleMethodsList(role));
+			#end
 		}
 
 		return TPath(type);
@@ -426,7 +436,8 @@ class Dci
 										var noCompletion = { pos: f.expr.pos, params: [], name: ":noCompletion" };
 										var roleField = contextField(FFun(f), methodName, [APrivate], f.expr.pos, [noCompletion]);
 										
-										role.methods.set(name, roleField);
+										if(role.methods != null)
+											role.methods.set(name, roleField);
 										
 										//if(f.ret == null)
 										//	haxe.macro.Context.warning("The RoleMethod " + field.name + "." + name + " has no return type, add it if you need autocompletion.", expr.pos);
@@ -484,6 +495,9 @@ class Dci
 					
 			case _: error(field.pos);
 		}		
+		
+		// Some autocomplete problem forces this
+		if (roles == null) roles = new Roles();
 		
 		roles.set(field.name, role);
 	}
