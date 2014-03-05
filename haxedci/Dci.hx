@@ -330,9 +330,8 @@ class Dci
 			}
 			// Creates a compile error if RoleInterface field exists on the type, which is useful.			
 			
-			// TExtend changed in 3.1, need this fix when haxe_ver works (gives same value for 3.0.1 right now)
-			#if (haxe_ver >= 3.01)
-			return TExtend(type, roleMethodsList(role));
+			#if (haxe_ver >= 3.1)
+			return TExtend([type], roleMethodsList(role));
 			#else
 			return TExtend(type, roleMethodsList(role));
 			#end
