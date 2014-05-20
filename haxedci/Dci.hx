@@ -92,20 +92,23 @@ class Dci
 			}				
 		}
 		
-		// Test if all roles were bound.
-		for (roleName in roles.keys())
+		if (!Context.defined("display"))
 		{
-			if (roles.get(roleName).bound == null)
-				Context.warning("Role " + roleName + " isn't bound in this Context.", roles.get(roleName).field.pos);
+			// Test if all roles were bound.
+			for (roleName in roles.keys())
+			{
+				if (roles.get(roleName).bound == null)
+					Context.warning("Role " + roleName + " isn't bound in this Context.", roles.get(roleName).field.pos);
+			}
+			
+			#if dcigraphs
+			if (diagram != null)
+			{
+				diagram.generateSequenceDiagrams();
+				diagram.generateDependencyGraphs();
+			}
+			#end
 		}
-		
-		#if dcigraphs
-		if (!Context.defined("display") && diagram != null)
-		{
-			diagram.generateSequenceDiagrams();
-			diagram.generateDependencyGraphs();
-		}
-		#end
 		
 		for (roleName in roles.keys())
 		{
