@@ -17,6 +17,8 @@ Browse to the [haxedci-example](https://github.com/ciscoheat/haxedci-example) re
 If you compile with the flag `-D dcigraphs`, [sequence diagrams](http://en.wikipedia.org/wiki/Sequence_diagram) will automatically be generated for the Contexts, placed in the `bin/dcigraphs` directory. Useful for visualizing the distributed algorithm in a Context, and how the Roles interact with each other.
 
 ## DCI Resources
+**Recommended:** [DCI – How to get ahead in system architecture](http://www.silexlabs.org/wwx2014-speech-andreas-soderlund-dci-how-to-get-ahead-in-system-architecture/) - My latest DCI speech.
+
 Website - [fulloo.info](http://fulloo.info) <br>
 FAQ - [DCI FAQ](http://fulloo.info/doku.php?id=faq) <br>
 Support - [stackoverflow](http://stackoverflow.com/questions/tagged/dci), tagging the question with **dci** <br>
