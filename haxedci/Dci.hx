@@ -3,27 +3,7 @@ package haxedci;
 #if macro
 import haxe.macro.Expr;
 import haxe.macro.Context;
-import haxedci.DiagramGenerator.RoleMethods;
-using haxe.macro.ExprTools;
-
-private class Role
-{
-	// RoleMethod name -> Field (field.name is rewritten so it cannot be used directly)
-	public var methods : Map<String, Field>;
-
-	public var field : Field;
-	public var bound : Position;
-
-	public function new(field : Field)
-	{
-		if (field == null) throw "Null field: " + field;
-
-		this.field = field;
-		this.methods = new Map<String, Field>();
-	}
-}
-
-private typedef Roles = Map<String, Role>;
+using Lambda;
 
 class Dci
 {
@@ -32,293 +12,91 @@ class Dci
 		return new Dci().execute();
 	}
 
-	static var CONTEXT = "context";
-	static var SELF = "self";
+	/**
+	 * Class field name => Role
+	 */
+	public var roles(default, null) : Map<String, Role>;
+	
+	/**
+	 * RoleMethod field => Role
+	 */
+	public var roleMethodAssociations(default, null) : Map<Field, Role>;
 
 	/**
-	 * @deprecated Define the type directly on the class field instead.
+	 * Last role bind function, to test role binding errors.
 	 */
-	static var ROLEINTERFACE = "roleInterface";
+	public var roleBindMethod : Function;
 
-	var roles : Roles;
+	/**
+	 * Last role bind position, in case of a role binding error.
+	 */
+	public var lastRoleBindPos : Position;
+	
+	var fields : Array<Field>;
 
 	public function new()
 	{
-		roles = new Roles();
+		fields = Context.getBuildFields();
+		roles = new Map<String, Role>();
+		roleMethodAssociations = new Map<Field, Role>();
+		
+		for (f in fields.filter(Role.isRoleField))
+			roles.set(f.name, new Role(f, this));
 	}
 
 	public function execute() : Array<Field>
 	{
-		var fields = Context.getBuildFields();
-		var outputFields : Array<Field> = [];
-		var diagram : DiagramGenerator;
+		var outputFields = [];
 
-		//trace("======================== Context: " + Context.getLocalClass());
+		trace("======== Context: " + Context.getLocalClass());
 
-		for (field in fields)
-		{
-			if (hasRole(field))
-				addRole(field);
-			else
+		// Loop through fields again to avoid putting them in incorrect order.
+		for (field in fields) {
+			var role = roles.get(field.name);
+			if (role != null) {
+				role.addFields(outputFields);
+			}
+			else {
 				outputFields.push(field);
-		}
-
-		#if dcigraphs
-		if(!Context.defined("display"))
-			diagram = new DiagramGenerator(Context.getLocalClass().toString());
-		#end
-
-		// Replace function calls with Role method calls, where appropriate
-		for (field in fields)
-		{
-			var isRole = hasRole(field);
-
-			var ex : Expr;
-			var functionName : String = null;
-			var functionRef : Function = null;
-
-			switch(field.kind)
-			{
-				case FVar(_, e):
-					ex = e;
-				case FFun(f):
-					ex = f.expr;
-					functionName = field.name;
-					functionRef = f;
-				case FProp(_, _, _, e):
-					ex = e;
-			}
-
-			if (ex != null)
-			{
-				//trace("----- Field: " + field.name);
-				ex.iter(function(e) { replaceRoleMethodCalls(e, isRole ? field.name : null, functionName, functionRef, diagram); } );
 			}
 		}
 
-		if (!Context.defined("display"))
-		{
+		for (field in outputFields) {
+			var role = roleMethodAssociations.get(field);
+			//trace(field.name + " has role " + (role == null ? '<no role>' : role.name));
+			new RoleMethodReplacer(field, roleMethodAssociations.get(field), this).replace();
+		}
+
+		if (!Context.defined("display")) {
 			// Test if all roles were bound.
-			for (roleName in roles.keys())
-			{
-				if (roles.get(roleName).bound == null)
-					Context.warning("Role " + roleName + " isn't bound in this Context.", roles.get(roleName).field.pos);
-			}
-
-			#if dcigraphs
-			if (diagram != null)
-			{
-				diagram.generateSequenceDiagrams();
-				diagram.generateDependencyGraphs();
-			}
-			#end
+			for (role in roles) if (role.bound == null)
+				Context.warning("Role " + role.name + " isn't bound in this Context.", role.field.pos);			
 		}
-
-		for (roleName in roles.keys())
-		{
-			if (roles.get(roleName).methods == null) continue;
-
-			for (roleMethod in roles.get(roleName).methods)
-			{
-				switch(roleMethod.kind)
-				{
-					case FFun(f):
-						addSelfToMethod(f, roleName);
-
-					case _:
-						Context.error('Incorrect RoleMethod definition.', roleMethod.pos);
-				}
-			}
-		}
-
-		for (role in roles)
-		{
+		
+		/*
+		for (role in roles)	{
 			// Could fix possible autocompletion problem:
 			//if (role.methods == null) continue;
-
-			outputFields.push(role.field);
-
-			for (method in role.methods)
-				outputFields.push(method);
 		}
+		*/
 
 		return outputFields;
 	}
+}
 
-	static function hasRole(field : Field)
-	{
-		return Lambda.exists(field.meta, function(m) { return m.name == "role"; } );
-	}
+// ----------------------------------------------------------------------------------------------
 
-	// Replace Role method calls with the transformed version.
-	// If roleName is null, we're not in a RoleMethod.
-	// If methodName is null, we're not in a method (rather a var or property)
-	var lastRoleRef : Expr;
-	var roleBindMethod : Function;
-	function replaceRoleMethodCalls(e : Expr, roleName : String, methodName : String, methodRef : Function, generator : DiagramGenerator)
-	{
-		if (Context.defined("display")) return;
-
-		switch(e.expr)
-		{
-			case EBinop(op, e1, e2):
-				switch(op)
-				{
-					case OpAssign:
-						var fieldArray = extractField(e1, roleName);
-						if (fieldArray != null)
-						{
-							if (fieldArray[0] == "this") fieldArray.shift();
-
-							if (fieldArray.length == 1 && roles.exists(fieldArray[0]))
-							{
-								// Set where the Role was bound in the Context.
-								roles.get(fieldArray[0]).bound = e.pos;
-
-								//haxe.macro.Context.warning("Binding role " + fieldArray[0] + " in " + methodName, e.pos);
-
-								if (roleBindMethod == null)
-								{
-									roleBindMethod = methodRef;
-								}
-								else if (roleBindMethod != methodRef)
-								{
-									Context.warning('Last Role assignment outside current method', lastRoleRef.pos);
-									Context.error('All Roles in a Context must be assigned in the same method.', e.pos);
-								}
-
-								lastRoleRef = e;
-							}
-						}
-
-					case _:
-				}
-
-			case EFunction(name, f):
-				// Note that anonymous functions will have name == null, then keep previous name.
-				var mName = name != null ? name : methodName;
-				//if(name != null) trace("- Function: " + roleName + "." + mName);
-				replaceRoleMethodCalls(f.expr, roleName, mName, methodRef, generator);
-				return;
-
-			case EField(e3, fd):
-				var fieldArray = extractField(e, roleName);
-				if (fieldArray != null)
-				{
-					// Rewriting [this, console, newline] to [this, console_newline]
-					//trace(fieldArray);
-
-					var newArray = [];
-					var skip = false;
-					var length = fieldArray.length;
-
-					for (i in 0...length)
-					{
-						if (skip)
-						{
-							skip = false;
-							continue;
-						}
-
-						// Test if we're past the end of array (no need to check last field),
-						// or if a Role is matching the field.
-						var field = fieldArray[i];
-
-						if (generator != null && roles.exists(field))
-						{
-							if (roleName != null)
-							{
-								generator.addDependency(roleName, field);
-							}
-							else if(i < length-1 && roles.get(field).methods.exists(fieldArray[i+1]))
-							{
-								generator.addDependency(roleName, field);
-							}
-						}
-
-						if (i > length-2 || !roles.exists(field) || roles.get(field).methods == null || !roles.get(field).methods.exists(fieldArray[i+1]))
-						{
-							newArray.push(field);
-						}
-						else
-						{
-							var roleMethod = roleMethodName(field, fieldArray[i + 1]);
-							newArray.push(roleMethod);
-							skip = true; // Skip next field since it's now a part of the Role method call.
-
-							//trace("RoleMethod call: " + roleMethod + " at " + e3.pos);
-							//trace(roleName, methodName, field, fieldArray[i + 1]);
-
-							// Add diagram generation data
-							if (generator != null)
-							{
-								if (roleName == null && methodName != null)
-								{
-									generator.addInteraction(methodName, field, fieldArray[i + 1]);
-								}
-								else if (roleName != null && methodName != null)
-								{
-									generator.addRoleMethodCall(roleName, methodName, field, fieldArray[i + 1]);
-								}
-							}
-						}
-					}
-
-					if (fieldArray.length != newArray.length)
-					{
-						e.expr = buildField(newArray, newArray.length - 1, e3.pos);
-						return;
-					}
-				}
-
-			case _:
-		}
-
-		e.iter(function(e) { replaceRoleMethodCalls(e, roleName, methodName, methodRef, generator); });
-	}
-
-	// Extract the field to an array. this.test.length = ['this', 'test', 'length']
-	// Also replace "self" with the roleName if set.
-	static function extractField(e : Expr, roleName : String)
-	{
-		var output = [];
-		while (true)
-		{
-			switch(e.expr)
-			{
-				case EField(e2, field):
-					var replace = (roleName != null && field == SELF) ? roleName : field;
-					output.unshift(replace);
-					e = e2;
-
-				case EConst(c):
-					switch(c)
-					{
-						case CIdent(s):
-							var replace = (roleName != null && s == SELF) ? roleName : s;
-							output.unshift(replace);
-							//trace(output);
-							return output;
-
-						case _:
-							return null;
-					}
-
-				case _:
-					return null;
-			}
-		}
-	}
-
+	/*
 	// The reverse of extractField.
-	static function buildField(identifiers, i, pos)
-	{
+	static function buildField(identifiers, i, pos)	{
 		if (i > 0)
 			return EField({expr: buildField(identifiers, i - 1, pos), pos: pos}, identifiers[i]);
 		else
 			return EConst(CIdent(identifiers[i]));
 	}
+	*/
 
+	/*
 	// Special trick for autocompletion: At runtime, only objects that fulfill the RoleObjectContract
 	// should be bound to a Role. When compiling however, it is convenient to also have the RoleMethods
 	// displayed. Therefore, test if we're in autocomplete mode, add the RoleMethods if so.
@@ -588,5 +366,5 @@ class Dci
 				addSelfToMethod(f, roleName);
 		}
 	}
-}
+	*/
 #end
