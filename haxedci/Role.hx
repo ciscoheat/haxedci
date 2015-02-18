@@ -56,12 +56,13 @@ class Role
 	}
 	
 	public function addFields(fields : Array<Field>) {
-		// Add the field itself
-		fields.push(field);
-
-		// TODO: Merge type with RoleInterface in display mode
-		if (Context.defined("display")) return;
+		//new RoleObjectContractTypeMerger(field, this).merge(fields);
 		
+		if(!Context.defined("display"))
+			fields.push(field);
+		else
+			new RoleObjectContractTypeMerger(field, this).merge(fields);
+
 		// Add the RoleMethods
 		for (rmName in roleMethods.keys()) {
 			var rm = roleMethods.get(rmName);

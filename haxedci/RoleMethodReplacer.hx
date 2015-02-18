@@ -8,8 +8,11 @@ import haxe.macro.Context;
 using haxe.macro.ExprTools;
 using Lambda;
 
-// -----------------------------------------
-
+/**
+ * Tests if roles are bound in the same function,
+ * and replaces RoleMethod calls with its mangled representation.
+ * i.e. this.console.cursor.pos => this.console__cursor.pos
+ */
 class RoleMethodReplacer
 {
 	public function new(field : Field, currentRole : Role, context : Dci) {
@@ -89,16 +92,6 @@ class RoleMethodReplacer
 				case OpAssign: roles_bindRole(e1, currentFunction);
 				case _:
 			}
-
-			/*
-			case EFunction(name, f):
-				// Note that anonymous functions will have name == null, then keep previous name.
-				// TODO: Still required?
-				//var mName = name != null ? name : methodName;
-				//if(name != null) trace("- Function: " + roleName + "." + mName);
-				field_replace(f.expr, Option.Some(f));
-				return;
-			*/
 
 			case EField(_, _): 
 				if (field_replaceField(e)) return;
