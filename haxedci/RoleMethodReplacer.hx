@@ -1,5 +1,7 @@
 package haxedci;
 import haxe.ds.Option;
+import sys.io.File;
+import sys.io.FileOutput;
 
 #if macro
 import haxe.macro.Expr;
@@ -22,11 +24,21 @@ class RoleMethodReplacer
 	}
 	
 	public function replace() {
-		if (Context.defined("display")) return;
-		switch(field.kind) {
-			case FVar(_, e): if(e != null) e.iter(field_replace.bind(_, Option.None));
-			case FFun(f): if(f.expr != null) f.expr.iter(field_replace.bind(_, Option.Some(f)));
-			case FProp(_, _, _, e): if(e != null) e.iter(field_replace.bind(_, Option.None));
+		if (Context.defined("display")) {
+			// A tricky case: When inside a RoleMethod the following RoleMethods aren't
+			// found by the compiler. So it needs to be detected and manually resolved.
+			//if (currentRole == null) return;
+			switch(field.kind) {
+				case FVar(_, e): if(e != null) e.iter(field_displayMergedType);
+				case FFun(f): if(f.expr != null) f.expr.iter(field_displayMergedType);
+				case FProp(_, _, _, e): if(e != null) e.iter(field_displayMergedType);
+			}
+		} else {
+			switch(field.kind) {
+				case FVar(_, e): if(e != null) e.iter(field_replace.bind(_, Option.None));
+				case FFun(f): if(f.expr != null) f.expr.iter(field_replace.bind(_, Option.Some(f)));
+				case FProp(_, _, _, e): if(e != null) e.iter(field_replace.bind(_, Option.None));
+			}			
 		}
 	}
 	
@@ -85,7 +97,21 @@ class RoleMethodReplacer
 			}
 		}
 	}
-	
+
+	function field_displayMergedType(e : Expr) {
+		switch(e.expr) {
+			case EDisplay(e2, isCall):
+				switch(e2) {
+					case macro self:
+						e2.expr = (macro $i{currentRole.name}).expr;
+					case _:
+						//Dci.fileTrace(field_extractArray(e));
+				}
+			case _:
+				e.iter(field_displayMergedType);
+		}
+	}
+
 	function field_replace(e : Expr, currentFunction : Option<Function>) {
 		switch(e.expr) {
 			case EBinop(op, e1, e2): switch op {
