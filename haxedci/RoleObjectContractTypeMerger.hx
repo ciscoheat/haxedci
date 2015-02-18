@@ -16,9 +16,9 @@ class RoleObjectContractTypeMerger
 	var field : Field;
 	var role : Role;
 
-	public function new(field : Field, role : Role) {
-		this.field = field;
+	public function new(role : Role) {
 		this.role = role;
+		this.field = role.field;
 		
 		switch(field.kind) {
 			case FVar(t, _): this.type = t;
@@ -26,12 +26,8 @@ class RoleObjectContractTypeMerger
 		}
 	}
 	
-	public function merge(fields : Array<Field>) {
-		//field_mergeWithRole();
-		if (Context.defined("display"))
-			field.kind = FVar(field_mergeWithRole(), null);
-			
-		fields.push(field);
+	public function mergedType() : ComplexType {
+		return field_mergeWithRole();
 	}
 	
 	function field_mergeWithRole() : ComplexType {
@@ -66,11 +62,6 @@ class RoleObjectContractTypeMerger
 		}
 	}
 	
-	function onTypeNotfound(type : String) : TypeDefinition {
-		trace("not found: " + type);
-		return null;
-	}
-	
 	// Special trick for autocompletion: At runtime, only objects that fulfill the RoleObjectContract
 	// should be bound to a Role. When compiling however, it is convenient to also have the RoleMethods
 	// displayed. Therefore, test if we're in autocomplete mode, add the RoleMethods if so.
@@ -101,6 +92,7 @@ class RoleObjectContractTypeMerger
 				});
 				*/
 			case TType(t, _):
+				return mergeTypeAndRoleObjectContract(Context.follow(t.get().type), typePath);
 				/*
 				var underlying = t.get();
 				trace("Found underlying type " + underlying.type + ", trying new merge.");
@@ -117,8 +109,8 @@ class RoleObjectContractTypeMerger
 			case _:
 		}
 		
-		trace("Extending " + typePath.name + " with RoleObjectContract");
 		var roleMethods = role_methodList();
+		//Dci.fileTrace("Extending " + typePath.name + " with RoleObjectContract " + roleMethods.map(function(f) return f.name));
 		// Creates a compile error if RoleObjectContract field exists on the type, 
 		// which is useful since it's not allowed.
 		if (roleMethods.length == 0) return TPath(typePath);

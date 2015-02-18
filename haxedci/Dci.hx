@@ -18,7 +18,7 @@ class Dci
 		var f : FileOutput;
 		try f = File.append(file, false)
 		catch (e : Dynamic) f = File.write(file, false);
-		f.writeString(Std.string(o) + "\r\n");
+		f.writeString(Std.string(o) + "\n");
 		f.close();
 	}
 	

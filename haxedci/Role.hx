@@ -34,7 +34,7 @@ class Role
 	public function new(field : Field, context : Dci) {
 		if (field == null) throw "Null field.";
 		if (context == null) throw "Null context.";
-
+		
 		this.context = context;
 		this.field = field;
 		this.bound = null;
@@ -55,7 +55,7 @@ class Role
 	}
 	
 	public function addFields(fields : Array<Field>) {
-		new RoleObjectContractTypeMerger(field, this).merge(fields);
+		fields.push(field);
 
 		// Add the RoleMethods
 		for (rmName in roleMethods.keys()) {

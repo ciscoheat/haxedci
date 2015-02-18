@@ -101,15 +101,34 @@ class RoleMethodReplacer
 	function field_displayMergedType(e : Expr) {
 		switch(e.expr) {
 			case EDisplay(e2, isCall):
+				// Looking for self or a role in the current context.
 				switch(e2) {
 					case macro self:
-						e2.expr = (macro $i{currentRole.name}).expr;
+						if (currentRole != null) {
+							e2.expr = complexTypeExpr(
+								new RoleObjectContractTypeMerger(currentRole).mergedType()
+							);
+						}
 					case _:
-						//Dci.fileTrace(field_extractArray(e));
+						var ident = field_extractArray(e2);
+						if (ident != null) {
+							if (ident[0] == 'this' || ident[0] == 'context') ident.shift();
+							if (ident.length == 1 && context.roles.exists(ident[0])) {
+								e2.expr = complexTypeExpr(
+									new RoleObjectContractTypeMerger(
+										context.roles.get(ident[0])
+									).mergedType()
+								);
+							}
+						}
 				}
 			case _:
 				e.iter(field_displayMergedType);
 		}
+	}
+	
+	static function complexTypeExpr(t : ComplexType) : ExprDef {
+		return (macro { var __temp : $t = null; __temp; }).expr;
 	}
 
 	function field_replace(e : Expr, currentFunction : Option<Function>) {
