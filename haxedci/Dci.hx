@@ -1,8 +1,9 @@
 package haxedci;
 
-#if macro
 import haxe.macro.Expr;
 import haxe.macro.Context;
+import sys.io.File;
+import sys.io.FileOutput;
 using Lambda;
 
 class Dci
@@ -12,6 +13,15 @@ class Dci
 		return new Dci().execute();
 	}
 
+	public static function fileTrace(o : Dynamic, file = "e:\\temp\\fileTrace.txt")
+	{
+		var f : FileOutput;
+		try f = File.append(file, false)
+		catch (e : Dynamic) f = File.write(file, false);
+		f.writeString(Std.string(o) + "\r\n");
+		f.close();
+	}
+	
 	/**
 	 * Class field name => Role
 	 */
@@ -61,7 +71,6 @@ class Dci
 			}
 		}
 		
-		if (Context.defined("display")) return outputFields;
 
 		for (field in outputFields) {
 			var role = roleMethodAssociations.get(field);
@@ -69,11 +78,12 @@ class Dci
 			new RoleMethodReplacer(field, roleMethodAssociations.get(field), this).replace();
 		}
 
-		// Test if all roles were bound.
-		for (role in roles) if (role.bound == null)
-			Context.warning("Role " + role.name + " isn't bound in this Context.", role.field.pos);
+		if (!Context.defined("display")) {
+			// Test if all roles were bound.
+			for (role in roles) if (role.bound == null)
+				Context.warning("Role " + role.name + " isn't bound in this Context.", role.field.pos);			
+		}
 		
 		return outputFields;
 	}
 }
-#end
