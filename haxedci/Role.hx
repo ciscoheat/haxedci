@@ -1,6 +1,5 @@
 package haxedci;
 
-#if macro
 import haxe.macro.Expr;
 import haxe.macro.Context;
 
@@ -56,12 +55,7 @@ class Role
 	}
 	
 	public function addFields(fields : Array<Field>) {
-		//new RoleObjectContractTypeMerger(field, this).merge(fields);
-		
-		if(!Context.defined("display"))
-			fields.push(field);
-		else
-			new RoleObjectContractTypeMerger(field, this).merge(fields);
+		new RoleObjectContractTypeMerger(field, this).merge(fields);
 
 		// Add the RoleMethods
 		for (rmName in roleMethods.keys()) {
@@ -129,4 +123,3 @@ class Role
 		}
 	}
 }
-#end
