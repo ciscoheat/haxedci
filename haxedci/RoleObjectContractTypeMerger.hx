@@ -28,7 +28,9 @@ class RoleObjectContractTypeMerger
 	
 	public function merge(fields : Array<Field>) {
 		//field_mergeWithRole();
-		field.kind = FVar(field_mergeWithRole(), null);
+		if (Context.defined("display"))
+			field.kind = FVar(field_mergeWithRole(), null);
+			
 		fields.push(field);
 	}
 	
@@ -83,6 +85,7 @@ class RoleObjectContractTypeMerger
 					trace("Abstract type without implementation, using RoleObjectContract only.");
 					return TAnonymous(role_methodList());
 				}
+				/*
 				var impl = t.get().impl.get();
 				var implPath = impl.pack.join('.') + (impl.pack.length > 0 ? '.' : '') + impl.name;
 				trace("Found abstract type that implements " + implPath + ", trying new merge.");
@@ -95,8 +98,10 @@ class RoleObjectContractTypeMerger
 					),
 					pack: impl.pack,
 					name: impl.name
-				});				
+				});
+				*/
 			case TType(t, _):
+				/*
 				var underlying = t.get();
 				trace("Found underlying type " + underlying.type + ", trying new merge.");
 				return mergeTypeAndRoleObjectContract(underlying.type, {
@@ -108,6 +113,7 @@ class RoleObjectContractTypeMerger
 					pack: underlying.pack,
 					name: underlying.name
 				});
+				*/
 			case _:
 		}
 		
