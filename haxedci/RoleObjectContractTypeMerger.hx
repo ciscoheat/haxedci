@@ -10,19 +10,15 @@ using haxe.macro.ComplexTypeTools;
 
 class RoleObjectContractTypeMerger
 {
-	//static var typeCache = new Map<String, Type>();
-	
 	var type : ComplexType;
-	var field : Field;
 	var role : Role;
 
 	public function new(role : Role) {
 		this.role = role;
-		this.field = role.field;
 		
-		switch(field.kind) {
+		switch(role.field.kind) {
 			case FVar(t, _): this.type = t;
-			case _: Context.error("Only var fields can be a Role.", field.pos);
+			case _: Context.error("Only var fields can be a Role.", role.field.pos);
 		}
 	}
 	
@@ -31,7 +27,7 @@ class RoleObjectContractTypeMerger
 	}
 	
 	function field_mergeWithRole() : ComplexType {
-		trace('----- Merging field and RoleObjectContract "${field.name}"');
+		trace('----- Merging field and RoleObjectContract "${role.field.name}"');
 		
 		switch(type) {
 			case TAnonymous(fields):
@@ -57,7 +53,7 @@ class RoleObjectContractTypeMerger
 				return mergeTypeAndRoleObjectContract(realType, p);
 
 			case _:
-				Context.error("RoleObjectContracts must be defined as a Type or with class notation according to http://haxe.org/manual/struct#class-notation", field.pos);
+				Context.error("RoleObjectContracts must be defined as a Type or with class notation according to http://haxe.org/manual/struct#class-notation", role.field.pos);
 				return null;
 		}
 	}
@@ -162,6 +158,7 @@ class RoleObjectContractTypeMerger
 				});
 			}
 		}
+		
 		return output;
 	}
 }
