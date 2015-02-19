@@ -17,33 +17,32 @@ using Lambda;
  */
 class RoleMethodReplacer
 {
-	public function new(field : Field, currentRole : Role, context : Dci) {
-		this.field = field;
+	public function new(currentRole : Role, context : Dci) {
 		this.context = context;
 		this.currentRole = currentRole;
 	}
+
+	public function autocomplete(e : Expr) {
+		if (e != null) e.iter(field_displayMergedType);
+	}
+
+	public function autocompleteField(field : Field) {
+		switch(field.kind) {
+			case FVar(_, e): autocomplete(e);
+			case FFun(f): autocomplete(f.expr);
+			case FProp(_, _, _, e): autocomplete(e);
+		}		
+	}
 	
-	public function replace() {
-		if (Context.defined("display")) {
-			// A tricky case: When inside a RoleMethod the following RoleMethods aren't
-			// found by the compiler. So it needs to be detected and manually resolved.
-			//if (currentRole == null) return;
-			switch(field.kind) {
-				case FVar(_, e): if(e != null) e.iter(field_displayMergedType);
-				case FFun(f): if(f.expr != null) f.expr.iter(field_displayMergedType);
-				case FProp(_, _, _, e): if(e != null) e.iter(field_displayMergedType);
-			}
-		} else {
-			switch(field.kind) {
-				case FVar(_, e): if(e != null) e.iter(field_replace.bind(_, Option.None));
-				case FFun(f): if(f.expr != null) f.expr.iter(field_replace.bind(_, Option.Some(f)));
-				case FProp(_, _, _, e): if(e != null) e.iter(field_replace.bind(_, Option.None));
-			}			
-		}
+	public function replace(field : Field) {
+		switch(field.kind) {
+			case FVar(_, e): if(e != null) e.iter(field_replace.bind(_, Option.None));
+			case FFun(f): if(f.expr != null) f.expr.iter(field_replace.bind(_, Option.Some(f)));
+			case FProp(_, _, _, e): if(e != null) e.iter(field_replace.bind(_, Option.None));
+		}			
 	}
 	
 	var currentRole : Role;
-	var field : Field;
 	var context : Dci;
 	
 	function roles_bindRole(e : Expr, currentFunction : Option<Function>) {
@@ -103,6 +102,12 @@ class RoleMethodReplacer
 			case EDisplay(e2, isCall):
 				// Looking for self or a role in the current context.
 				switch(e2) {
+					/*
+					case macro this, macro context:
+						var t = Dci.contextTypes.get(context.name);
+						Dci.fileTrace("Using stored context type: " + t);
+						if(t != null) e2.expr = (macro { var __temp : $t = null; __temp; }).expr;
+					*/
 					case macro self:
 						if (currentRole != null) {
 							e2.expr = complexTypeExpr(

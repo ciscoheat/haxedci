@@ -72,7 +72,7 @@ class Dci
 			}
 		}
 		
-		return new Dci().execute();
+		return new Dci().addRoleMethods();
 	}
 
 	public static function fileTrace(o : Dynamic, file = "e:\\temp\\fileTrace.txt")
@@ -118,13 +118,13 @@ class Dci
 		roleMethodAssociations = new Map<Field, Role>();
 		
 		for (f in fields.filter(Role.isRoleField))
-			roles.set(f.name, new Role(f, this));
+			roles.set(f.name, new Role(f, this));			
 	}
 
-	public function execute() : Array<Field>
+	public function addRoleMethods() : Array<Field>
 	{
 		var outputFields = [];
-
+		
 		//trace("======== Context: " + Context.getLocalClass());
 
 		// Loop through fields again to avoid putting them in incorrect order.
@@ -139,23 +139,32 @@ class Dci
 		}		
 
 		for (field in outputFields) {
-			var role = roleMethodAssociations.get(field);
 			//trace(field.name + " has role " + (role == null ? '<no role>' : role.name));
-			new RoleMethodReplacer(field, roleMethodAssociations.get(field), this).replace();
+			var replacer = new RoleMethodReplacer(roleMethodAssociations.get(field), this);
+			
+			if(Context.defined("display"))
+				replacer.autocompleteField(field);
+			else
+				replacer.replace(field);
 		}
 
-		if (!Context.defined("display")) {
-			for (role in roles) {
-				if (role.bound == null)
-					Context.warning("Role " + role.name + " isn't bound in this Context.", role.field.pos);
-				
-				var cacheKey = this.name + '-' + role.name;
-				
-				rmSignatures.set(cacheKey, []);
-				for (rm in role.roleMethods)
-					rmSignatures.get(cacheKey).push(rm.signature);
-			}			
-		}
+		if (Context.defined("display")) return outputFields;
+		
+		for (role in roles) {
+			if (role.bound == null) {
+				Context.warning(
+					"Role " + role.name + " isn't bound in this Context.", 
+					role.field.pos
+				);
+			}
+			
+			var cacheKey = this.name + '-' + role.name;
+			
+			// Store the RoleMethod signatures for autocompletion.
+			rmSignatures.set(cacheKey, []);
+			for (rm in role.roleMethods)
+				rmSignatures.get(cacheKey).push(rm.signature);
+		}			
 		
 		return outputFields;
 	}

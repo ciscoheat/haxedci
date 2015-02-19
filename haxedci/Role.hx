@@ -83,6 +83,8 @@ class Role
 	public function addFields(fields : Array<Field>) {
 		fields.push(field);
 		
+		//if (Context.defined("display")) return;
+		
 		// Add the RoleMethods
 		for (rmName in roleMethods.keys()) {
 			var rm = roleMethods.get(rmName);
