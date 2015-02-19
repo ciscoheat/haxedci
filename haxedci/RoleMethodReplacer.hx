@@ -1,9 +1,9 @@
 package haxedci;
+
+#if macro
 import haxe.ds.Option;
 import sys.io.File;
 import sys.io.FileOutput;
-
-#if macro
 import haxe.macro.Expr;
 import haxe.macro.Context;
 

@@ -66,11 +66,11 @@ class RoleObjectContractTypeMerger
 		if(type != null) switch(type) {
 			case TMono(_), TLazy(_), TFun(_, _), TEnum(_, _), TDynamic(_):
 				trace("Not a class or structure, using RoleObjectContract only.");
-				return TAnonymous(role_methodList());
+				return TAnonymous(role_typeDef());
 			case TAbstract(t, _):
 				if (t.get().impl == null) {
 					trace("Abstract type without implementation, using RoleObjectContract only.");
-					return TAnonymous(role_methodList());
+					return TAnonymous(role_typeDef());
 				}
 				/*
 				var impl = t.get().impl.get();
@@ -105,7 +105,7 @@ class RoleObjectContractTypeMerger
 			case _:
 		}
 		
-		var roleMethods = role_methodList();
+		var roleMethods = role_typeDef();
 		//Dci.fileTrace("Extending " + typePath.name + " with RoleObjectContract " + roleMethods.map(function(f) return f.name));
 		// Creates a compile error if RoleObjectContract field exists on the type, 
 		// which is useful since it's not allowed.
@@ -131,35 +131,41 @@ class RoleObjectContractTypeMerger
 			}
 		}
 
-		return TAnonymous(fields.concat(role_methodList()));
+		return TAnonymous(fields.concat(role_typeDef()));
 	}
 
-	function role_methodList() : Array<Field> {
+	function role_typeDef() : Array<Field> {
+		if (Context.defined("display")) {
+			return Dci.rmSignatures.get(role.context.name + '-' + role.name);
+		}
+		else
+			throw "role_typeDef should only be used in display mode.";
+
+		/*
 		var output = new Array<Field>();
 
 		for (roleName in role.roleMethods.keys()) {
-			var f = role.roleMethods.get(roleName);
-			// TODO: Use some Context method to get the type?
-			if (f.ret != null) {
-				// There cannot be a body for the function because we're only creating 
-				// a field definition, so a new definition needs to be created.
-				output.push({
-					kind: FFun({
-						ret: f.ret,
-						params: f.params,
-						expr: null,
-						args: f.args						
-					}),
-					name: roleName,
-					access: [],
-					pos: f.expr.pos,
-					meta: [],
-					doc: null
-				});
-			}
+			var rm = role.roleMethods.get(roleName);
+			var f = rm.func;
+			var signature : Function;
+			
+			// TODO: Extract the type from the function?
+			if (f.ret == null) continue;
+			
+			// There cannot be a body for the function because we're only creating 
+			// a field definition, so a new definition needs to be created.
+			output.push({
+				kind: FFun(signature),
+				name: roleName,
+				access: [],
+				pos: f.expr.pos,
+				meta: [],
+				doc: null
+			});
 		}
 		
 		return output;
+		*/
 	}
 }
 #end

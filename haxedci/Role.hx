@@ -6,6 +6,32 @@ import haxe.macro.Context;
 using haxe.macro.ExprTools;
 using Lambda;
 
+class RoleMethod
+{
+	public var name(get, null) : String;
+	function get_name() return signature.name;
+	
+	public var func : Function;
+	public var signature : Field;
+	
+	public function new(name : String, func : Function) {
+		this.func = func;
+		this.signature = {
+			kind: FFun({
+				ret: func.ret,
+				params: func.params,
+				expr: null,
+				args: func.args
+			}),
+			name: name,
+			access: [],
+			pos: func.expr.pos,
+			meta: [],
+			doc: null
+		};
+	}
+}
+
 class Role
 {
 	public static var CONTEXT = "context";
@@ -56,15 +82,15 @@ class Role
 	
 	public function addFields(fields : Array<Field>) {
 		fields.push(field);
-
+		
 		// Add the RoleMethods
 		for (rmName in roleMethods.keys()) {
 			var rm = roleMethods.get(rmName);
 			var field = {
-				pos: rm.expr.pos,
+				pos: rm.func.expr.pos,
 				name: roleMethodFieldName(this.name, rmName),
-				meta: [{ pos: rm.expr.pos, params: [], name: ":noCompletion" }],
-				kind: FFun(rm),
+				meta: [{ pos: rm.func.expr.pos, params: [], name: ":noCompletion" }],
+				kind: FFun(rm.func),
 				doc: null,
 				access: [APrivate]
 			};
@@ -74,7 +100,7 @@ class Role
 		}
 	}
 
-	var context : Dci;
+	public var context : Dci;
 
 	public var field(default, null) : Field;
 	public var bound(default, default) : Position;
@@ -85,9 +111,9 @@ class Role
 	/**
 	 * Method name => Function
 	 */
-	public var roleMethods(default, null) : Map<String, Function>;
+	public var roleMethods(default, null) : Map<String, RoleMethod>;
 	function get_roleMethods() {
-		var output = new Map<String, Function>();
+		var output = new Map<String, RoleMethod>();
 		switch(field.kind) {
 			case FVar(t, e): 
 				if (t == null)
@@ -96,9 +122,9 @@ class Role
 					case EBlock(exprs): for(e in exprs) switch e.expr {
 						case EFunction(name, f):
 							if (name == null) Context.error("A RoleMethod must have a name.", e.pos);
-							output.set(name, f);
+							output.set(name, new RoleMethod(name, f));
 						case _:
-							Context.error("A Role can only contain RoleMethods.", e.pos);
+							Context.error("A Role can only contain simple functions as RoleMethods.", e.pos);
 					}
 					case _: 
 						Context.error("A Role can only be assigned a block of RoleMethods.", e.pos);
@@ -109,8 +135,9 @@ class Role
 		return output;
 	}
 
-	function roleMethods_addSelf(f : Function)
+	function roleMethods_addSelf(rm : RoleMethod)
 	{
+		var f = rm.func;
 		var roleName = this.name;
 		switch(f.expr.expr)
 		{
@@ -119,7 +146,7 @@ class Role
 				exprs.unshift(macro var $CONTEXT = this);
 			case _:
 				f.expr = {expr: EBlock([f.expr]), pos: f.expr.pos};
-				roleMethods_addSelf(f);
+				roleMethods_addSelf(rm);
 		}
 	}
 }
