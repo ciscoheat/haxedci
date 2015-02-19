@@ -74,17 +74,17 @@ class Role
 		// And for convenience, because now it can simply be added in addFields()
 		switch(field.kind) {
 			case FVar(t, e):
-				field.kind = FVar(t, null);
+				field.kind = Context.defined("display") 
+					? FVar(new RoleObjectContractTypeMerger(this).mergedType(), null)
+					: FVar(t, null);
 			case _:
 				Context.error("Only var fields can be a Role.", field.pos);
 		}
 	}
 	
-	public function addFields(fields : Array<Field>) {
+	public function addFields(fields : Array<Field>) {		
 		fields.push(field);
-		
-		//if (Context.defined("display")) return;
-		
+
 		// Add the RoleMethods
 		for (rmName in roleMethods.keys()) {
 			var rm = roleMethods.get(rmName);

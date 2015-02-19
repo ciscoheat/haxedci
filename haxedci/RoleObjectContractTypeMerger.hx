@@ -40,7 +40,12 @@ class RoleObjectContractTypeMerger
 				return mergeTypeAndRoleObjectContract(type.toType(), p);
 
 			case _:
-				Context.error("RoleObjectContracts must be defined as a Type or with class notation according to http://haxe.org/manual/struct#class-notation", role.field.pos);
+				// If in display mode, the type is merged and should be displayed.
+				if (Context.defined("display")) return type;
+				
+				// If not in display mode, the type isn't properly defined.
+				Context.error("RoleObjectContracts must be defined as a Type or with class " + 
+				"notation according to http://haxe.org/manual/struct#class-notation", role.field.pos);
 				return null;
 		}
 	}

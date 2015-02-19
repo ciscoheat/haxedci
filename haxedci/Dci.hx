@@ -162,7 +162,7 @@ class Dci
 			
 			// Store the RoleMethod signatures for autocompletion.
 			rmSignatures.set(cacheKey, []);
-			for (rm in role.roleMethods)
+			for (rm in role.roleMethods) if(rm.func.ret != null)
 				rmSignatures.get(cacheKey).push(rm.signature);
 		}			
 		
