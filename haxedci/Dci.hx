@@ -128,7 +128,7 @@ class Dci
 	/**
 	 * Last role bind function, to test role binding errors.
 	 */
-	public var roleBindMethod : Function;
+	public var roleBindFunction : Function;
 
 	/**
 	 * Last role bind position, in case of a role binding error.

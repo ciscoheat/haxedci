@@ -24,16 +24,16 @@ class RoleMethodReplacer
 
 	public function replace(field : Field) {
 		switch(field.kind) {
-			case FVar(_, e): if(e != null) e.iter(replaceField.bind(_, Option.None));
-			case FFun(f): if(f.expr != null) f.expr.iter(replaceField.bind(_, Option.Some(f)));
-			case FProp(_, _, _, e): if(e != null) e.iter(replaceField.bind(_, Option.None));
+			case FVar(_, e): if(e != null) e.iter(replaceInExpr.bind(_, Option.None));
+			case FFun(f): if(f.expr != null) f.expr.iter(replaceInExpr.bind(_, Option.Some(f)));
+			case FProp(_, _, _, e): if(e != null) e.iter(replaceInExpr.bind(_, Option.None));
 		}			
 	}
 	
 	var role : Role;
 	var context : Dci;
 	
-	function roles_bindRole(e : Expr, currentFunction : Option<Function>) {
+	function setRoleBindPos(e : Expr, currentFunction : Option<Function>) {
 		var fieldArray = extractIdentifier(e);
 		if (fieldArray == null) return;
 		if (fieldArray[0] == "this") fieldArray.shift();		
@@ -48,17 +48,20 @@ class RoleMethodReplacer
 		switch(currentFunction) {
 			case None: Context.error('Role must be bound in a Context method!', e.pos);
 			case Some(f):
-				if (context.roleBindMethod == null) {
-					context.roleBindMethod = f;
-					context.lastRoleBindPos = e.pos;
+				if (context.roleBindFunction == null) {
+					context.roleBindFunction = f;					
 				}
-				else if (context.roleBindMethod != f) {
+				else if (context.roleBindFunction != f) {
 					Context.warning(
 						'All Roles in a Context must be assigned in the same function.', 
 						context.lastRoleBindPos
 					);
-					Context.error('All Roles in a Context must be assigned in the same function.', e.pos);
+					Context.error(
+						'All Roles in a Context must be assigned in the same function.', 
+						e.pos
+					);
 				}
+				context.lastRoleBindPos = e.pos;
 		}
 	}
 	
@@ -85,15 +88,15 @@ class RoleMethodReplacer
 		}
 	}
 
-	function replaceField(e : Expr, currentFunction : Option<Function>) {
+	function replaceInExpr(e : Expr, currentFunction : Option<Function>) {
 		switch(e.expr) {
-			case EFunction(name, f) if(f.expr != null): replaceField(f.expr, Some(f)); return;
-			case EBinop(OpAssign, e1, e2): roles_bindRole(e1, currentFunction);
+			case EFunction(name, f) if(f.expr != null): replaceInExpr(f.expr, Some(f)); return;
+			case EBinop(OpAssign, e1, e2): setRoleBindPos(e1, currentFunction);
 			case EField(_, _): if (replaceIdentifiers(e)) return;				
 			case _:
 		}
 
-		e.iter(replaceField.bind(_, currentFunction));
+		e.iter(replaceInExpr.bind(_, currentFunction));
 	}
 	
 	function replaceIdentifiers(e : Expr) {
@@ -130,19 +133,11 @@ class RoleMethodReplacer
 		}
 		
 		if (fieldArray.length != newArray.length) {
-			e.expr = buildField(newArray, newArray.length - 1, e.pos);
+			e.expr = (macro $p{newArray}).expr;
 			return true;
 		}
 		
 		return false;
-	}
-	
-	function buildField(identifiers, i, pos) {
-		if (i > 0)
-			return EField({expr: buildField(identifiers, i - 1, pos), pos: pos}, identifiers[i]);
-		else
-			return EConst(CIdent(identifiers[i]));
-	}
-
+	}	
 }
 #end

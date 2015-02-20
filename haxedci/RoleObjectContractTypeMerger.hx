@@ -11,14 +11,14 @@ using haxe.macro.ComplexTypeTools;
 
 class RoleObjectContractTypeMerger
 {
-	var type : ComplexType;
+	var complexType : ComplexType;
 	var role : Role;
 
 	public function new(role : Role) {
 		this.role = role;
 		
 		switch(role.field.kind) {
-			case FVar(t, _): this.type = t;
+			case FVar(t, _): this.complexType = t;
 			case _: Context.error("Only var fields can be a Role.", role.field.pos);
 		}
 	}
@@ -30,18 +30,18 @@ class RoleObjectContractTypeMerger
 	function type_mergeWithRole() : ComplexType {
 		//trace('----- Merging type and RoleObjectContract "${role.field.name}"');
 		
-		switch(type) {
+		switch(complexType) {
 			case TAnonymous(fields):
 				//trace("TAnonymous, merge with RoleObjectContract.");
 				return mergeAnonymousInterfaces(fields);
 
 			case TPath(p):
 				//trace('TPath: ' + p.pack.toDotPath(p.name));
-				return mergeTypeAndRoleObjectContract(type.toType(), p);
+				return mergeTypeAndRoleObjectContract(complexType.toType(), p);
 
 			case _:
 				// If in display mode, the type is merged and should be displayed.
-				if (Context.defined("display")) return type;
+				if (Context.defined("display")) return complexType;
 				
 				// If not in display mode, the type isn't properly defined.
 				Context.error("RoleObjectContracts must be defined as a Type or with class " + 
@@ -53,18 +53,22 @@ class RoleObjectContractTypeMerger
 	function mergeTypeAndRoleObjectContract(type : Type, typePath : TypePath) : ComplexType {		
 		// Can only extend classes and structures, so test if type is one of those.
 		if(type != null) switch(type) {
-			case TMono(_), TLazy(_), TFun(_, _), TEnum(_, _), TDynamic(_):
+			case TMono(_), TLazy(_), TFun(_, _), TEnum(_, _), TDynamic(_), TAbstract(_, _):
 				//trace("Not a class or structure, using RoleObjectContract only.");
 				return TAnonymous(role_typeDef());
-			case TAbstract(t, _):
-				if (t.get().impl == null) {
-					//trace("Abstract type without implementation, using RoleObjectContract only.");
-					return TAnonymous(role_typeDef());
-				}
-				// TODO: Test if recursion with the underlying type is needed (or follow)
 			case TType(t, _):
 				return mergeTypeAndRoleObjectContract(Context.follow(t.get().type), typePath);
-			case _:
+			case TAnonymous(_):
+			case TInst(_, _):
+				/*
+				var instType = ct.get();
+				typePath = typePath != null ? typePath : {
+					sub: null,
+					params: instType.params.map(function(tp) return TPType(Context.toComplexType(tp.t))),
+					pack: instType.pack,
+					name: instType.name
+				};
+				*/
 		}
 		
 		var roleMethods = role_typeDef();
@@ -76,7 +80,7 @@ class RoleObjectContractTypeMerger
 		return TExtend([typePath], roleMethods);
 		#else
 		return TExtend(typePath, roleMethods);
-		#end		
+		#end
 	}
 
 	function mergeAnonymousInterfaces(fields : Array<Field>) : ComplexType {
