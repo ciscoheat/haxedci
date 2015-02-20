@@ -65,11 +65,9 @@ class Role
 		this.field = field;
 		this.bound = null;
 		this.roleMethods = get_roleMethods();
-
-		// Add "self" and "context" to roleMethods.
-		for (rm in roleMethods)
-			roleMethods_addSelf(rm);
-
+	}
+	
+	public function addFields(fields : Array<Field>) {
 		// Remove expr from field, not needed anymore when roleMethods are extracted
 		// And for convenience, because now it can simply be added in addFields()
 		switch(field.kind) {
@@ -80,10 +78,13 @@ class Role
 			case _:
 				Context.error("Only var fields can be a Role.", field.pos);
 		}
-	}
-	
-	public function addFields(fields : Array<Field>) {		
+		
 		fields.push(field);
+
+		var cacheKey = context.name + '-' + this.name;
+			
+		// Store the RoleMethod signatures for autocompletion.
+		Dci.rmSignatures.set(cacheKey, []);
 
 		// Add the RoleMethods
 		for (rmName in roleMethods.keys()) {
@@ -96,9 +97,21 @@ class Role
 				doc: null,
 				access: [APrivate]
 			};
+
+			// Add "self" and "context" to roleMethods, and set a type.
+			roleMethods_addSelf(rm);			
+
+			#if debug
+			if (rm.func.ret == null && Context.defined("dci-signatures-warnings")) {
+				Context.warning("RoleMethod without explicit return value", rm.func.expr.pos);
+			}
+			#end
 			
 			context.roleMethodAssociations.set(field, this);
 			fields.push(field);
+			
+			if(rm.func.ret != null)
+				Dci.rmSignatures.get(cacheKey).push(rm.signature);
 		}
 	}
 
@@ -110,9 +123,6 @@ class Role
 	public var name(get, null) : String;
 	function get_name() return field.name;
 
-	/**
-	 * Method name => Function
-	 */
 	public var roleMethods(default, null) : Map<String, RoleMethod>;
 	function get_roleMethods() {
 		var output = new Map<String, RoleMethod>();

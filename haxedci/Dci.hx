@@ -11,9 +11,16 @@ import sys.FileStat;
 import sys.FileSystem;
 import sys.io.File;
 import sys.io.FileOutput;
+
 using Lambda;
+using StringTools;
 using haxe.macro.MacroStringTools;
 
+/**
+ * A syntax-level DCI Context. This means that concepts like a Role
+ * Aren't a true DCI Role, more like how a programmer that implements DCI
+ * would think about a Role.
+ */
 class Dci
 {
 	// "Context-Role" => Field
@@ -22,7 +29,19 @@ class Dci
 	
 	@macro public static function context() : Array<Field>
 	{
-		var file = Context.resolvePath('') + 'haxedci-signatures.bin';
+		// Since the autocompletion cannot resolve all RoleMethods for a Role
+		// unless inside the very last one, save signatures here for usage in
+		// display mode.
+		
+		var file : String;
+		var signatures = Context.definedValue("dci-signatures");
+		
+		if(signatures == null)
+			file = Context.resolvePath('') + 'dci-signatures.bin';
+		else if (signatures.indexOf('/') >= 0 || signatures.indexOf('\\') >= 0)
+			file = signatures;
+		else
+			file = Context.resolvePath('') + signatures;
 		
 		if (rmSignatures == null) {
 			rmSignatures = new Map<String, Array<Field>>();
@@ -40,17 +59,19 @@ class Dci
 						}
 					}
 					rmSignaturesMtime = FileSystem.stat(file).mtime.getTime();
-					Dci.fileTrace("Unserializing rmSignatures: " + rmSignatures.array().length);
+					//Dci.fileTrace("Unserializing rmSignatures: " + rmSignatures.array().length);
 				} catch (e : Dynamic) {}
 			} else {
-				Context.onAfterGenerate(function() {
-					// Cannot serialize pos automatically.
+				#if debug
+				if (signatures != "") Context.onAfterGenerate(function() {
+					// Write the RoleMethod signatures to a file so autocompletion can use it.
 					var ser = new Serializer();
 					ser.serialize(rmSignatures.array().length);
 					for (key in rmSignatures.keys()) {
 						ser.serialize(key);
 						ser.serialize(rmSignatures.get(key).length);
 						for (field in rmSignatures.get(key)) {
+							// Cannot serialize pos automatically...
 							var p = Context.getPosInfos(field.pos);
 							field.pos = null;
 							ser.serialize(field);
@@ -59,24 +80,34 @@ class Dci
 					}
 					File.saveContent(file, ser.toString());
 					rmSignaturesMtime = FileSystem.stat(file).mtime.getTime();
-					Dci.fileTrace(FileSystem.stat(file).mtime + " compiled rmSignatures: " + rmSignatures.array().length);
+					//Dci.fileTrace("Compiled rmSignatures: " + rmSignatures.array().length);
 				});
+				#end
 			}
-		} else if (Context.defined("display")) {
+		} 
+		#if debug
+		else if (signatures != "" && Context.defined("display")) {
 			if (rmSignaturesMtime < FileSystem.stat(file).mtime.getTime()) {
-				Dci.fileTrace("rmSignatures changed, renewing.");
+				//Dci.fileTrace("rmSignatures changed, renewing.");
 				rmSignatures = null;
 				return context();
 			} else {
-				Dci.fileTrace("Reused rmSignatures: " + rmSignatures.array().length);
+				//Dci.fileTrace("Reused rmSignatures: " + rmSignatures.array().length);
 			}
 		}
+		#end
 		
 		return new Dci().addRoleMethods();
 	}
 
-	public static function fileTrace(o : Dynamic, file = "e:\\temp\\fileTrace.txt")
+	/**
+	 * Debugging autocompletion is very tedious, so here's a helper method.
+	 */
+	public static function fileTrace(o : Dynamic, ?file : String)
 	{
+		file = Context.definedValue("filetrace");
+		if (file == null) file = "e:\\temp\\filetrace.txt";
+		
 		var f : FileOutput;
 		try f = File.append(file, false)
 		catch (e : Dynamic) f = File.write(file, false);
@@ -127,43 +158,24 @@ class Dci
 		
 		//trace("======== Context: " + Context.getLocalClass());
 
-		// Loop through fields again to avoid putting them in incorrect order.
 		for (field in fields) {
 			var role = roles.get(field.name);
-			if (role != null) {
+			
+			if (role != null)
 				role.addFields(outputFields);
-			}
-			else {
+			else
 				outputFields.push(field);
-			}
 		}		
 
-		for (field in outputFields) {
-			//trace(field.name + " has role " + (role == null ? '<no role>' : role.name));
-			var replacer = new RoleMethodReplacer(roleMethodAssociations.get(field), this);
-			
-			if(Context.defined("display"))
-				replacer.autocompleteField(field);
-			else
-				replacer.replace(field);
-		}
-
+		// No more work to do in display mode.
 		if (Context.defined("display")) return outputFields;
+
+		for (field in outputFields) {
+			new RoleMethodReplacer(roleMethodAssociations.get(field), this).replace(field);
+		}
 		
-		for (role in roles) {
-			if (role.bound == null) {
-				Context.warning(
-					"Role " + role.name + " isn't bound in this Context.", 
-					role.field.pos
-				);
-			}
-			
-			var cacheKey = this.name + '-' + role.name;
-			
-			// Store the RoleMethod signatures for autocompletion.
-			rmSignatures.set(cacheKey, []);
-			for (rm in role.roleMethods) if(rm.func.ret != null)
-				rmSignatures.get(cacheKey).push(rm.signature);
+		for (role in roles) if (role.bound == null) {
+			Context.warning("Role " + role.name + " isn't bound in this Context.", role.field.pos);
 		}			
 		
 		return outputFields;

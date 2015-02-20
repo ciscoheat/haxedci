@@ -96,8 +96,8 @@ class RoleObjectContractTypeMerger
 	}
 
 	function role_typeDef() : Array<Field> {
-		// TODO: Move rmSignatures to a better place
-		return Dci.rmSignatures.get(role.context.name + '-' + role.name);
+		var output = Dci.rmSignatures.get(role.context.name + '-' + role.name);
+		return output == null ? [] : output;
 	}
 }
 #end

@@ -17,48 +17,34 @@ using Lambda;
  */
 class RoleMethodReplacer
 {
-	public function new(currentRole : Role, context : Dci) {
+	public function new(role : Null<Role>, context : Dci) {
 		this.context = context;
-		this.currentRole = currentRole;
+		this.role = role;
 	}
 
-	public function autocomplete(e : Expr) {
-		if (e != null) e.iter(field_displayMergedType);
-	}
-
-	public function autocompleteField(field : Field) {
-		switch(field.kind) {
-			case FVar(_, e): autocomplete(e);
-			case FFun(f): autocomplete(f.expr);
-			case FProp(_, _, _, e): autocomplete(e);
-		}		
-	}
-	
 	public function replace(field : Field) {
 		switch(field.kind) {
-			case FVar(_, e): if(e != null) e.iter(field_replace.bind(_, Option.None));
-			case FFun(f): if(f.expr != null) f.expr.iter(field_replace.bind(_, Option.Some(f)));
-			case FProp(_, _, _, e): if(e != null) e.iter(field_replace.bind(_, Option.None));
+			case FVar(_, e): if(e != null) e.iter(replaceField.bind(_, Option.None));
+			case FFun(f): if(f.expr != null) f.expr.iter(replaceField.bind(_, Option.Some(f)));
+			case FProp(_, _, _, e): if(e != null) e.iter(replaceField.bind(_, Option.None));
 		}			
 	}
 	
-	var currentRole : Role;
+	var role : Role;
 	var context : Dci;
 	
 	function roles_bindRole(e : Expr, currentFunction : Option<Function>) {
-		var fieldArray = field_extractArray(e);
+		var fieldArray = extractIdentifier(e);
 		if (fieldArray == null) return;
 		if (fieldArray[0] == "this") fieldArray.shift();		
 		if (fieldArray.length != 1)	return;
 		
-		var role = context.roles.find(function(r) return r.name == fieldArray[0]);
-		if (role == null) return;
+		var boundRole = context.roles.find(function(r) return r.name == fieldArray[0]);
+		if (boundRole == null) return;
 		
 		// Set where the Role was bound in the Context.
-		role.bound = e.pos;
+		boundRole.bound = e.pos;
 
-		//trace("Binding role " + fieldArray[0], e.pos);
-		
 		switch(currentFunction) {
 			case None: Context.error('Role must be bound in a Context method!', e.pos);
 			case Some(f):
@@ -67,93 +53,51 @@ class RoleMethodReplacer
 					context.lastRoleBindPos = e.pos;
 				}
 				else if (context.roleBindMethod != f) {
-					Context.warning('Last Role assignment outside current method', context.lastRoleBindPos);
-					Context.error('All Roles in a Context must be assigned in the same method.', e.pos);
+					Context.warning(
+						'All Roles in a Context must be assigned in the same function.', 
+						context.lastRoleBindPos
+					);
+					Context.error('All Roles in a Context must be assigned in the same function.', e.pos);
 				}
 		}
 	}
-
-	function field_extractArray(e : Expr) {
+	
+	/**
+	 * Returns an array of identifiers from the current expression,
+	 * or null if the expression isn't an EField or EConst.
+	 */
+	function extractIdentifier(e : Expr) {
 		var fields = [];
 		while (true) {
 			switch(e.expr) {
 				case EField(e2, field):
-					var replace = (currentRole != null && field == Role.SELF) ? currentRole.name : field;
+					var replace = (role != null && field == Role.SELF) ? role.name : field;
 					fields.unshift(replace);
 					e = e2;
 
-				case EConst(c):
-					switch(c) {
-						case CIdent(s):
-							var replace = (currentRole != null && s == Role.SELF) ? currentRole.name : s;
-							fields.unshift(replace);
-							return fields;
-							
-						case _: return null;
-					}
-					
+				case EConst(CIdent(s)):
+					var replace = (role != null && s == Role.SELF) ? role.name : s;
+					fields.unshift(replace);
+					return fields;
+
 				case _:	return null;
 			}
 		}
 	}
 
-	function field_displayMergedType(e : Expr) {
+	function replaceField(e : Expr, currentFunction : Option<Function>) {
 		switch(e.expr) {
-			case EDisplay(e2, isCall):
-				// Looking for self or a role in the current context.
-				switch(e2) {
-					/*
-					case macro this, macro context:
-						var t = Dci.contextTypes.get(context.name);
-						Dci.fileTrace("Using stored context type: " + t);
-						if(t != null) e2.expr = (macro { var __temp : $t = null; __temp; }).expr;
-					*/
-					case macro self:
-						if (currentRole != null) {
-							e2.expr = complexTypeExpr(
-								new RoleObjectContractTypeMerger(currentRole).mergedType()
-							);
-						}
-					case _:
-						var ident = field_extractArray(e2);
-						if (ident != null) {
-							if (ident[0] == 'this' || ident[0] == 'context') ident.shift();
-							if (ident.length == 1 && context.roles.exists(ident[0])) {
-								e2.expr = complexTypeExpr(
-									new RoleObjectContractTypeMerger(
-										context.roles.get(ident[0])
-									).mergedType()
-								);
-							}
-						}
-				}
-			case _:
-				e.iter(field_displayMergedType);
-		}
-	}
-	
-	static function complexTypeExpr(t : ComplexType) : ExprDef {
-		return (macro { var __temp : $t = null; __temp; }).expr;
-	}
-
-	function field_replace(e : Expr, currentFunction : Option<Function>) {
-		switch(e.expr) {
-			case EBinop(op, e1, e2): switch op {
-				case OpAssign: roles_bindRole(e1, currentFunction);
-				case _:
-			}
-
-			case EField(_, _): 
-				if (field_replaceField(e)) return;
-				
+			case EFunction(name, f) if(f.expr != null): replaceField(f.expr, Some(f)); return;
+			case EBinop(OpAssign, e1, e2): roles_bindRole(e1, currentFunction);
+			case EField(_, _): if (replaceIdentifiers(e)) return;				
 			case _:
 		}
 
-		e.iter(field_replace.bind(_, currentFunction));
+		e.iter(replaceField.bind(_, currentFunction));
 	}
 	
-	function field_replaceField(e : Expr) {
-		var fieldArray = field_extractArray(e);
+	function replaceIdentifiers(e : Expr) {
+		var fieldArray = extractIdentifier(e);
 		if (fieldArray == null) return false;
 		
 		// Given that console is a Role, rewriting 
@@ -175,9 +119,9 @@ class RoleMethodReplacer
 				newArray.push(field);
 			} else {
 				// Test if a Role is matching the field.
-				var role = context.roles.get(field);
-				if (role != null && role.roleMethods.exists(fieldArray[i + 1])) {
-					newArray.push(Role.roleMethodFieldName(role.name, fieldArray[i+1]));
+				var matchingRole = context.roles.get(field);
+				if (matchingRole != null && matchingRole.roleMethods.exists(fieldArray[i + 1])) {
+					newArray.push(Role.roleMethodFieldName(fieldArray[i], fieldArray[i+1]));
 					skip = true; // Skip next field since it's now a part of the Role method call.
 				} else {
 					newArray.push(field);
@@ -186,16 +130,16 @@ class RoleMethodReplacer
 		}
 		
 		if (fieldArray.length != newArray.length) {
-			e.expr = field_build(newArray, newArray.length - 1, e.pos);
+			e.expr = buildField(newArray, newArray.length - 1, e.pos);
 			return true;
 		}
 		
 		return false;
 	}
 	
-	function field_build(identifiers, i, pos) {
+	function buildField(identifiers, i, pos) {
 		if (i > 0)
-			return EField({expr: field_build(identifiers, i - 1, pos), pos: pos}, identifiers[i]);
+			return EField({expr: buildField(identifiers, i - 1, pos), pos: pos}, identifiers[i]);
 		else
 			return EConst(CIdent(identifiers[i]));
 	}
