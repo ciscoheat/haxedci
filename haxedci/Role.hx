@@ -57,11 +57,9 @@ class Role
 		}
 	}
 	
-	public function new(field : Field, context : Dci) {
+	public function new(field : Field) {
 		if (field == null) throw "Null field.";
-		if (context == null) throw "Null context.";
 		
-		this.context = context;
 		this.field = field;
 		this.bound = null;
 		this.roleMethods = get_roleMethods();
@@ -80,11 +78,6 @@ class Role
 		}
 		
 		fields.push(field);
-
-		var cacheKey = context.name + '-' + this.name;
-			
-		// Store the RoleMethod signatures for autocompletion.
-		Dci.rmSignatures.set(cacheKey, []);
 
 		// Add the RoleMethods
 		for (rmName in roleMethods.keys()) {
@@ -107,15 +100,9 @@ class Role
 			}
 			#end
 			
-			context.roleMethodAssociations.set(field, this);
 			fields.push(field);
-			
-			if(rm.func.ret != null)
-				Dci.rmSignatures.get(cacheKey).push(rm.signature);
 		}
 	}
-
-	public var context : Dci;
 
 	public var field(default, null) : Field;
 	public var bound(default, default) : Position;

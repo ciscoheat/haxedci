@@ -17,51 +17,64 @@ using Lambda;
  */
 class RoleMethodReplacer
 {
-	public function new(role : Null<Role>, context : Dci) {
+	/**
+	 * Last role bind function, to test role binding errors.
+	 */
+	var roleBindFunction : Function;
+
+	var context : Dci;
+
+	public function new(context : Dci) {
 		this.context = context;
-		this.role = role;
 	}
 
-	public function replace(field : Field) {
+	public function replace(field : Field, role : Option<Role>) {
 		switch(field.kind) {
-			case FVar(_, e): if(e != null) e.iter(replaceInExpr.bind(_, Option.None));
-			case FFun(f): if(f.expr != null) f.expr.iter(replaceInExpr.bind(_, Option.Some(f)));
-			case FProp(_, _, _, e): if(e != null) e.iter(replaceInExpr.bind(_, Option.None));
+			case FVar(_, e): if(e != null) e.iter(replaceInExpr.bind(_, role, Option.None));
+			case FFun(f): if(f.expr != null) f.expr.iter(replaceInExpr.bind(_, role, Option.Some(f)));
+			case FProp(_, _, _, e): if(e != null) e.iter(replaceInExpr.bind(_, role, Option.None));
 		}			
 	}
+
+	function replaceInExpr(e : Expr, role : Option<Role>, currentFunction : Option<Function>) {
+		switch(e.expr) {
+			case EFunction(name, f) if(f.expr != null): replaceInExpr(f.expr, role, Some(f)); return;
+			case EField(_, _): if (replaceIdentifiers(e, role)) return;
+			case EBinop(OpAssign, e1, e2): setRoleBindPos(e1, role, currentFunction);
+			case _:
+		}
+
+		e.iter(replaceInExpr.bind(_, role, currentFunction));
+	}
 	
-	var role : Role;
-	var context : Dci;
-	
-	function setRoleBindPos(e : Expr, currentFunction : Option<Function>) {
-		var fieldArray = extractIdentifier(e);
+	function setRoleBindPos(e : Expr, role : Option<Role>, currentFunction : Option<Function>) {
+		var fieldArray = extractIdentifier(e, role);
 		if (fieldArray == null) return;
-		if (fieldArray[0] == "this") fieldArray.shift();		
+		if (fieldArray[0] == "this") fieldArray.shift();
 		if (fieldArray.length != 1)	return;
 		
-		var boundRole = context.roles.find(function(r) return r.name == fieldArray[0]);
+		var boundRole = context.roles.find(function(r) return r != null && r.name == fieldArray[0]);
 		if (boundRole == null) return;
-		
+
 		// Set where the Role was bound in the Context.
 		boundRole.bound = e.pos;
 
 		switch(currentFunction) {
 			case None: Context.error('Role must be bound in a Context method!', e.pos);
 			case Some(f):
-				if (context.roleBindFunction == null) {
-					context.roleBindFunction = f;					
+				if (roleBindFunction == null) {
+					roleBindFunction = f;					
 				}
-				else if (context.roleBindFunction != f) {
+				else if (roleBindFunction != f) {
 					Context.warning(
 						'All Roles in a Context must be assigned in the same function.', 
-						context.lastRoleBindPos
+						roleBindFunction.expr.pos
 					);
 					Context.error(
 						'All Roles in a Context must be assigned in the same function.', 
 						e.pos
 					);
 				}
-				context.lastRoleBindPos = e.pos;
 		}
 	}
 	
@@ -69,38 +82,34 @@ class RoleMethodReplacer
 	 * Returns an array of identifiers from the current expression,
 	 * or null if the expression isn't an EField or EConst.
 	 */
-	function extractIdentifier(e : Expr) {
+	function extractIdentifier(e : Expr, role : Option<Role>) : Null<Array<String>> {
 		var fields = [];
 		while (true) {
 			switch(e.expr) {
 				case EField(e2, field):
-					var replace = (role != null && field == Role.SELF) ? role.name : field;
+					var replace = switch(role) {
+						case None: field;
+						case Some(r): field == Role.SELF ? r.name : field;
+					}
 					fields.unshift(replace);
 					e = e2;
 
 				case EConst(CIdent(s)):
-					var replace = (role != null && s == Role.SELF) ? role.name : s;
+					var replace = switch(role)	{
+						case None: s;
+						case Some(r): s == Role.SELF ? r.name : s;
+					}
 					fields.unshift(replace);
 					return fields;
 
-				case _:	return null;
+				case _:	
+					return null;
 			}
 		}
 	}
 
-	function replaceInExpr(e : Expr, currentFunction : Option<Function>) {
-		switch(e.expr) {
-			case EFunction(name, f) if(f.expr != null): replaceInExpr(f.expr, Some(f)); return;
-			case EBinop(OpAssign, e1, e2): setRoleBindPos(e1, currentFunction);
-			case EField(_, _): if (replaceIdentifiers(e)) return;				
-			case _:
-		}
-
-		e.iter(replaceInExpr.bind(_, currentFunction));
-	}
-	
-	function replaceIdentifiers(e : Expr) {
-		var fieldArray = extractIdentifier(e);
+	function replaceIdentifiers(e : Expr, role : Option<Role>) {
+		var fieldArray = extractIdentifier(e, role);
 		if (fieldArray == null) return false;
 		
 		// Given that console is a Role, rewriting 
@@ -122,7 +131,8 @@ class RoleMethodReplacer
 				newArray.push(field);
 			} else {
 				// Test if a Role is matching the field.
-				var matchingRole = context.roles.get(field);
+				var matchingRole = context.roles.find(function(r) return r != null && r.name == field);
+
 				if (matchingRole != null && matchingRole.roleMethods.exists(fieldArray[i + 1])) {
 					newArray.push(Role.roleMethodFieldName(fieldArray[i], fieldArray[i+1]));
 					skip = true; // Skip next field since it's now a part of the Role method call.
