@@ -16,8 +16,7 @@ class RoleMethod
 	public var role : Role;
 	public var method : Function;
 	public var field : Field;
-
-	var signature : Field;
+	public var signature : Field;
 	
 	public function new(role : Role, name : String, method : Function) {
 		this.role = role;

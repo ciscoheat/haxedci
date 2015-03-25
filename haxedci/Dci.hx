@@ -156,7 +156,7 @@ class Dci
 			var roleField = role.field;			
 			switch(roleField.kind) {
 				case FVar(t, e):
-					// Removing the RoleMethods from the Field definition so it can be used as a normal Field.
+					// Removing the RoleMethods from the Field definition so it can be used as a normal Field.					
 					roleField.kind = Context.defined("display") 
 						? FVar(new RoleObjectContractTypeMerger(role).mergedType(), null)
 						: FVar(t, null);

@@ -101,7 +101,7 @@ class RoleObjectContractTypeMerger
 	}
 
 	function role_typeDef() : Array<Field> {
-		return [];
+		return [for(rm in role.roleMethods) rm.signature];
 		//var output = Dci.rmSignatures.get(role.context.name + '-' + role.name);
 		//return output == null ? [] : output;
 	}
