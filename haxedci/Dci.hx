@@ -1,18 +1,19 @@
 package haxedci;
 
 import haxe.ds.Option;
-import haxe.io.Bytes;
-import haxe.io.Path;
 import haxe.macro.Compiler;
 import haxe.macro.Expr;
 import haxe.macro.Context;
 import haxe.Serializer;
 import haxe.Unserializer;
+/*
+import haxe.io.Bytes;
+import haxe.io.Path;
 import sys.FileStat;
 import sys.FileSystem;
 import sys.io.File;
 import sys.io.FileOutput;
-import haxedci.Role.RoleMethod;
+*/
 
 using Lambda;
 using StringTools;
@@ -82,6 +83,7 @@ class Dci
 	/**
 	 * Debugging autocompletion is very tedious, so here's a helper method.
 	 */
+	 /*
 	public static function fileTrace(o : Dynamic, ?file : String)
 	{
 		file = Context.definedValue("filetrace");
@@ -93,57 +95,110 @@ class Dci
 		f.writeString(Std.string(o) + "\n");
 		f.close();
 	}
+	*/
 
 	//////////////////////////////////////////////////
 	
 	/**
 	 * System-wide role methods, to prevent collisions.
 	 */
-	static var roleMethods : Map<String, RoleMethod> = new Map<String, RoleMethod>();
+	//static var roleMethods : Map<String, RoleMethod> = new Map<String, RoleMethod>();
 
-	public var roles(default, null) : Map<Field, Null<Role>>;
-	public var name(default, null) : String;
+	public var fields(default, null) : Array<Field>;
+
+	public var roles(default, null) : Array<Role>;
+
+	public var roleMethods(default, null) : Array<RoleMethod>;
+
+	var name(default, null) : String;
 
 	public function new()
 	{
-		var cls = Context.getLocalClass().get();		
+		var cls = Context.getLocalClass().get();
 		name = cls.pack.toDotPath(cls.name);
 
-		roles = new Map<Field, Null<Role>>();
+		fields = Context.getBuildFields().filter(function(f) return !isRoleField(f));
+		roles = Context.getBuildFields().filter(isRoleField).map(function(f) return new Role(f));
+		roleMethods = [for(role in roles) for(rm in role.roleMethods) rm];
+	}
 
-		for (f in Context.getBuildFields())
-			roles.set(f, Role.isRoleField(f) ? new Role(f) : null);
+	static function isRoleField(field : Field) {
+		if (!field.meta.exists(function(m) return m.name == "role")) return false;
+		var error = function() {
+			Context.error("@role can only be used on non-static var fields.", field.pos);
+			return false;
+		}
+		
+		switch(field.kind) {
+			case FVar(_, _): 
+				return field.access.has(AStatic) ? error() : true;
+			case _:
+				return error();
+		}
 	}
 
 	public function addRoleMethods() : Array<Field>
 	{
-		var outputFields = [];
-		
-		for (field in roles.keys()) {
-			var role = roles.get(field);
-			
-			if (role != null) {
-				role.addFields(outputFields);
-			}
-			else
-				outputFields.push(field);
-		}		
-
 		var replacer = new RoleMethodReplacer(this);
 
-		for (field in outputFields) {
-			var role = roles.get(field);
-			replacer.replace(field, role == null ? Option.None : Option.Some(role));
+		//trace("=== Context: " + this.name);
+
+		for(f in fields) {
+			//trace("Adding field " + f.name);
+			replacer.replaceField(f);
 		}
 
-		// No more work to do in display mode.
-		if (Context.defined("display")) return outputFields;
-		
+		for (role in roles) {
+			var roleField = role.field;
+			switch(roleField.kind) {
+				case FVar(t, e):
+					// Removing the RoleMethods from the Field definition so it
+					// can be used as a normal Field.
+					roleField.kind = Context.defined("display") 
+						? FVar(new RoleObjectContractTypeMerger(role).mergedType(), null)
+						: FVar(t, null);
+				case _:
+					Context.error("Only var fields can be a Role.", roleField.pos);
+			}
+			
+			//trace("Adding role: " + roleField.name);
+			fields.push(roleField);
+
+			// Add the RoleMethods
+			for (roleMethod in role.roleMethods) {
+				replacer.replaceRoleMethod(roleMethod);
+				//trace("Adding roleMethod: " + roleMethod.field.name);
+				fields.push(roleMethod.field);
+
+				// Add "self" and "context" to roleMethods, and set a type.
+				var f = roleMethod.func;
+				var roleName = role.name;
+
+				switch(f.expr.expr)	{
+					case EBlock(exprs):
+						exprs.unshift(macro var context = this);
+						exprs.unshift(macro var self = $i{roleName});
+					case _:
+						f.expr = {
+							expr: EBlock([(macro var context = this), (macro var self = $i{roleName}), f.expr]), 
+							pos: f.expr.pos
+						};
+				}
+
+				#if debug
+				if (roleMethod.func.ret == null && Context.defined("dci-signatures-warnings")) {
+					Context.warning("RoleMethod without explicit return value", roleMethod.func.expr.pos);
+				}
+				#end
+			}
+		}
+
 		// After all replacement is done, test if all roles are bound.
-		for (role in roles) if (role != null && role.bound == null) {
-			Context.warning("Role " + role.name + " isn't bound in this Context.", role.field.pos);
-		}			
+		if(!Context.defined("display")) {
+			for (r in roles) if(r.bound == null)
+				Context.warning("Role " + r.name + " isn't bound in this Context.", r.field.pos);
+		}
 		
-		return outputFields;
+		return fields;
 	}
 }
