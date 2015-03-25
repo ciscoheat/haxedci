@@ -149,11 +149,13 @@ class Dci
 		}
 
 		for (role in roles) {
-			var roleField = role.field;
+			var roleMethodInjections = [
+				(macro var port, self = $i{role.name})
+			];
+			var roleField = role.field;			
 			switch(roleField.kind) {
 				case FVar(t, e):
-					// Removing the RoleMethods from the Field definition so it
-					// can be used as a normal Field.
+					// Removing the RoleMethods from the Field definition so it can be used as a normal Field.
 					roleField.kind = Context.defined("display") 
 						? FVar(new RoleObjectContractTypeMerger(role).mergedType(), null)
 						: FVar(t, null);
@@ -172,15 +174,14 @@ class Dci
 
 				// Add "self" and "context" to roleMethods, and set a type.
 				var f = roleMethod.func;
-				var roleName = role.name;
 
 				switch(f.expr.expr)	{
-					case EBlock(exprs):
-						exprs.unshift(macro var context = this);
-						exprs.unshift(macro var self = $i{roleName});
+					case EBlock(exprs): 
+						for(expr in roleMethodInjections) 
+							exprs.unshift(expr);
 					case _:
 						f.expr = {
-							expr: EBlock([(macro var context = this), (macro var self = $i{roleName}), f.expr]), 
+							expr: EBlock(roleMethodInjections.concat([f.expr])), 
 							pos: f.expr.pos
 						};
 				}

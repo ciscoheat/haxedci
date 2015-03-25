@@ -49,18 +49,26 @@ class RoleMethodReplacer
 	}
 
 	function replaceInExpr(e : Expr, currentRole : Option<Role>, currentFunction : Option<Function>) {
+		var hasRole = !currentRole.equals(Option.None);
 		switch(e.expr) {
-			case EFunction(_, f) if(f.expr != null): replaceInExpr(f.expr, currentRole, Some(f)); return;
+			case EFunction(_, f) if(f.expr != null): 
+				replaceInExpr(f.expr, currentRole, Some(f)); return;
 			case EConst(CIdent(name)): 
-				//if(name == "self" || name == "this") Context.warning("EConst Deprecated this/self", e.pos);
+				if(hasRole) testIdentifiersInRoleMethods(name, e);
 			case EField(e2, name): 
-				//if(name == "self" || name == "this") Context.warning("EField Deprecated this/self", e2.pos);
+				if(hasRole) testIdentifiersInRoleMethods(name, e2);
 				if(replaceIdentifiers(e, currentRole)) return;
-			case EBinop(OpAssign, e1, _): setRoleBindPos(e1, currentRole, currentFunction);
+			case EBinop(OpAssign, e1, _): 
+				setRoleBindPos(e1, currentRole, currentFunction);
 			case _:
 		}
 
 		e.iter(replaceInExpr.bind(_, currentRole, currentFunction));
+	}
+
+	function testIdentifiersInRoleMethods(name : String, e : Expr) {
+		if(name == "this") Context.error('"this" keyword is not allowed in RoleMethods, reference the field directly instead.', e.pos);
+		if(name == "self") Context.warning('"self" keyword is deprecated, use "port" instead.', e.pos);
 	}
 
 	function setRoleBindPos(e : Expr, currentRole : Option<Role>, currentFunction : Option<Function>) {
