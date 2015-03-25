@@ -115,7 +115,7 @@ class RoleMethodReplacer
 				case EField(e2, field):
 					var replace = switch(currentRole) {
 						case None: field;
-						case Some(r): (field == "self" || field == "port") ? r.name : field;
+						case Some(r): (field == "self" || field == RoleMethod.roleAccessor) ? r.name : field;
 					}
 					fields.unshift(replace);
 					e = e2;
@@ -123,7 +123,7 @@ class RoleMethodReplacer
 				case EConst(CIdent(s)):
 					var replace = switch(currentRole)	{
 						case None: s;
-						case Some(r): (s == "self" || s == "port") ? r.name : s;
+						case Some(r): (s == "self" || s == RoleMethod.roleAccessor) ? r.name : s;
 					}
 					fields.unshift(replace);
 					return fields;

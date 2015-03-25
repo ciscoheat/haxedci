@@ -139,6 +139,7 @@ class Dci
 
 	public function addRoleMethods() : Array<Field>
 	{
+		var roleAccessor = RoleMethod.roleAccessor;
 		var replacer = new RoleMethodReplacer(this);
 
 		//trace("=== Context: " + this.name);
@@ -150,7 +151,7 @@ class Dci
 
 		for (role in roles) {
 			var roleAliasInjection = [
-				(macro var port = $i{role.name}, self = port)
+				(macro var $roleAccessor = $i{role.name}, self = $i{roleAccessor})
 			];
 			var roleField = role.field;			
 			switch(roleField.kind) {
