@@ -15,6 +15,7 @@ class RoleObjectContractTypeMerger
 	var role : Role;
 
 	public function new(role : Role) {
+		if (role == null) throw "role cannot be null.";
 		this.role = role;
 		
 		switch(role.field.kind) {

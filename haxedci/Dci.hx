@@ -102,7 +102,7 @@ class Dci
 	/**
 	 * System-wide role methods, to prevent collisions.
 	 */
-	//static var roleMethods : Map<String, RoleMethod> = new Map<String, RoleMethod>();
+	static var allRoleMethods : Map<String, RoleMethod> = new Map<String, RoleMethod>();
 
 	public var fields(default, null) : Array<Field>;
 
@@ -149,8 +149,8 @@ class Dci
 		}
 
 		for (role in roles) {
-			var roleMethodInjections = [
-				(macro var port, self = $i{role.name})
+			var roleAliasInjection = [
+				(macro var port = $i{role.name}, self = port)
 			];
 			var roleField = role.field;			
 			switch(roleField.kind) {
@@ -168,29 +168,39 @@ class Dci
 
 			// Add the RoleMethods
 			for (roleMethod in role.roleMethods) {
+				if(allRoleMethods.exists(roleMethod.name) && !Context.defined("dci-allow-name-collisions")) {
+					var error = "RoleMethod name collision - cannot have same RoleMethod names in different Contexts.";
+					Context.warning(error, roleMethod.field.pos);
+					Context.error(error, allRoleMethods.get(roleMethod.name).field.pos);
+				}
+
 				replacer.replaceRoleMethod(roleMethod);
 				//trace("Adding roleMethod: " + roleMethod.field.name);
 				fields.push(roleMethod.field);
 
-				// Add "self" and "context" to roleMethods, and set a type.
-				var f = roleMethod.func;
+				// Add "port" to roleMethods
+				var method = roleMethod.method;
 
-				switch(f.expr.expr)	{
+				switch(method.expr.expr)	{
 					case EBlock(exprs): 
-						for(expr in roleMethodInjections) 
-							exprs.unshift(expr);
+						for(expr in roleAliasInjection) exprs.unshift(expr);
 					case _:
-						f.expr = {
-							expr: EBlock(roleMethodInjections.concat([f.expr])), 
-							pos: f.expr.pos
+						method.expr = {
+							expr: EBlock(roleAliasInjection.concat([method.expr])), 
+							pos: method.expr.pos
 						};
 				}
 
 				#if debug
-				if (roleMethod.func.ret == null && Context.defined("dci-signatures-warnings")) {
-					Context.warning("RoleMethod without explicit return value", roleMethod.func.expr.pos);
+				if (roleMethod.method.ret == null && Context.defined("dci-signatures-warnings")) {
+					Context.warning("RoleMethod without explicit return value", roleMethod.method.expr.pos);
 				}
 				#end
+			}
+
+			// Add to allRoleMethods for name collision testing.
+			for(roleMethod in role.roleMethods) {
+				allRoleMethods.set(roleMethod.name, roleMethod);
 			}
 		}
 

@@ -8,16 +8,8 @@ using Lambda;
 
 class Role
 {
-	public static var SELF = "self";	
-	public static var CONTEXT = "context";
-
-	public static function roleMethodFieldName(roleName : String, roleMethod : String)
-	{
-		return roleName + "__" + roleMethod;
-	}
-	
 	public function new(field : Field) {
-		if (field == null) throw "Null field.";
+		if (field == null) throw "field cannot be null.";
 		
 		this.field = field;
 		this.bound = null;
@@ -36,7 +28,7 @@ class Role
 		switch(field.kind) {
 			case FVar(t, e): 
 				if (t == null)
-					Context.error("A Role var must have a Type as RoleInterface.", field.pos);
+					Context.error("A Role var must have a Type as RoleObjectContract.", field.pos);
 				if(e != null) switch e.expr {
 					case EBlock(exprs): for(e in exprs) switch e.expr {
 						case EFunction(name, f):
@@ -52,20 +44,5 @@ class Role
 				Context.error("Only var fields can be a Role.", field.pos);
 		};
 		return output;
-	}
-
-	function roleMethods_addSelf(rm : RoleMethod)
-	{
-		var f = rm.func;
-		var roleName = this.name;
-		switch(f.expr.expr)
-		{
-			case EBlock(exprs):
-				exprs.unshift(macro var $SELF = this.$roleName);
-				exprs.unshift(macro var $CONTEXT = this);
-			case _:
-				f.expr = {expr: EBlock([f.expr]), pos: f.expr.pos};
-				roleMethods_addSelf(rm);
-		}
 	}
 }

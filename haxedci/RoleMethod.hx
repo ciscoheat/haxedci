@@ -4,37 +4,42 @@ import haxe.macro.Expr;
 
 class RoleMethod
 {
-	var name(get, null) : String;
-	function get_name() { return signature.name; };
+	public static function mangledFieldName(roleName : String, roleMethod : String)	{
+		return roleName + "__" + roleMethod;
+	}
+
+	public var name(get, null) : String;
+	function get_name() return signature.name;
 	
 	public var role : Role;
-	public var func : Function;
+	public var method : Function;
 	public var field : Field;
+
 	var signature : Field;
 	
-	public function new(role : Role, name : String, func : Function) {
+	public function new(role : Role, name : String, method : Function) {
 		this.role = role;
-		this.func = func;
+		this.method = method;
 
 		this.signature = {
 			kind: FFun({
-				ret: func.ret,
-				params: func.params,
+				ret: method.ret,
+				params: method.params,
 				expr: null,
-				args: func.args
+				args: method.args
 			}),
 			name: name,
 			access: [],
-			pos: func.expr.pos,
+			pos: method.expr.pos,
 			meta: [],
 			doc: null			
 		};
 
 		this.field = {
-			pos: func.expr.pos,
-			name: Role.roleMethodFieldName(role.name, name),
-			meta: [{ pos: func.expr.pos, params: [], name: ":noCompletion" }],
-			kind: FFun(func),
+			pos: method.expr.pos,
+			name: mangledFieldName(role.name, name),
+			meta: [{ pos: method.expr.pos, params: [], name: ":noCompletion" }],
+			kind: FFun(method),
 			doc: null,
 			access: [APrivate]
 		};

@@ -26,6 +26,8 @@ class RoleMethodReplacer
 	var roles : Map<String, Role>;
 
 	public function new(context : Dci) {
+		if (context == null) throw "context cannot be null.";
+
 		this.context = context;
 		this.roles = new Map<String, Role>();
 
@@ -113,7 +115,7 @@ class RoleMethodReplacer
 				case EField(e2, field):
 					var replace = switch(currentRole) {
 						case None: field;
-						case Some(r): field == Role.SELF ? r.name : field;
+						case Some(r): (field == "self" || field == "port") ? r.name : field;
 					}
 					fields.unshift(replace);
 					e = e2;
@@ -121,7 +123,7 @@ class RoleMethodReplacer
 				case EConst(CIdent(s)):
 					var replace = switch(currentRole)	{
 						case None: s;
-						case Some(r): s == Role.SELF ? r.name : s;
+						case Some(r): (s == "self" || s == "port") ? r.name : s;
 					}
 					fields.unshift(replace);
 					return fields;
@@ -134,7 +136,7 @@ class RoleMethodReplacer
 
 	/**
 	 * Given that console is a Role, rewriting 
-	 * [this, console, cursor, pos] to [this, console__cursor, pos]
+	 * [console, cursor, pos] to [console__cursor, pos]
 	 */
 	function replaceIdentifiers(e : Expr, currentRole : Option<Role>) {
 		var fieldArray = extractIdentifier(e, currentRole);
@@ -160,7 +162,7 @@ class RoleMethodReplacer
 				var matchingRole = roles.get(field);
 
 				if (matchingRole != null && matchingRole.roleMethods.exists(fieldArray[i + 1])) {
-					newArray.push(Role.roleMethodFieldName(fieldArray[i], fieldArray[i+1]));
+					newArray.push(RoleMethod.mangledFieldName(fieldArray[i], fieldArray[i+1]));
 					skip = true; // Skip next field since it's now a part of the Role method call.
 				} else {
 					newArray.push(field);
