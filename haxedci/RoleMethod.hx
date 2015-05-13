@@ -4,7 +4,7 @@ import haxe.macro.Expr;
 
 class RoleMethod
 {
-	public static var roleAccessor = "port";
+	public static var roleAccessor = "self";
 
 	public static function mangledFieldName(roleName : String, roleMethod : String)	{
 		return roleName + "__" + roleMethod;

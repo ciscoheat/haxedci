@@ -13,7 +13,7 @@ using Lambda;
 /**
  * Tests if roles are bound in the same function,
  * and replaces RoleMethod calls with its mangled representation.
- * i.e. this.console.cursor.pos => this.console__cursor.pos
+ * i.e. console.cursor.pos => console__cursor.pos
  */
 class RoleMethodReplacer
 {
@@ -22,13 +22,11 @@ class RoleMethodReplacer
 	 */
 	var roleBindFunction : Function;
 
-	var context : Dci;
 	var roles : Map<String, Role>;
 
 	public function new(context : Dci) {
 		if (context == null) throw "context cannot be null.";
 
-		this.context = context;
 		this.roles = new Map<String, Role>();
 
 		for(role in context.roles) roles.set(role.name, role);
@@ -49,9 +47,22 @@ class RoleMethodReplacer
 			case FProp(_, _, _, e): if(e != null) e.iter(replaceInExpr.bind(_, currentRole, Option.None));
 		}			
 	}
-
+	
 	function replaceInExpr(e : Expr, currentRole : Option<Role>, currentFunction : Option<Function>) {
 		var hasRole = !currentRole.equals(Option.None);
+		
+		var roleAliasTest = null;
+		roleAliasTest = function(e2 : Expr) {
+			if (e2 == null) return;
+			switch(e2.expr) {
+				case EParenthesis(e3): roleAliasTest(e3);
+				case EConst(CIdent(s)):
+					for (roleName in roles.keys()) if (roleName == s)
+						Context.error("Aliasing a Role isn't allowed, access a Role only through its given name.", e.pos);
+				case _:
+			}
+		}
+		
 		switch(e.expr) {
 			case EFunction(_, f) if(f.expr != null): 
 				replaceInExpr(f.expr, currentRole, Some(f)); return;
@@ -60,8 +71,14 @@ class RoleMethodReplacer
 			case EField(e2, name): 
 				if(hasRole) testIdentifiersInRoleMethods(name, e2);
 				if(replaceIdentifiers(e, currentRole)) return;
-			case EBinop(OpAssign, e1, _): 
-				setRoleBindPos(e1, currentRole, currentFunction);
+			case EBinop(OpAssign, e1, e2): 
+				if (!setRoleBindPos(e1, currentRole, currentFunction)) {
+					// Role wasn't bound, so test if something is being assigned to it. That's not allowed.
+					roleAliasTest(e2);
+				}
+			case EVars(vars):
+				for (v in vars) 
+					roleAliasTest(v.expr);
 			case _:
 		}
 
@@ -70,17 +87,17 @@ class RoleMethodReplacer
 
 	function testIdentifiersInRoleMethods(name : String, e : Expr) {
 		if(name == "this") Context.error('"this" keyword is not allowed in RoleMethods, reference the field directly instead.', e.pos);
-		if(name == "self") Context.warning('"self" keyword is deprecated, use "port" instead.', e.pos);
 	}
 
-	function setRoleBindPos(e : Expr, currentRole : Option<Role>, currentFunction : Option<Function>) {
+	// Returns true if a Role was successfully bound in the Expr.
+	function setRoleBindPos(e : Expr, currentRole : Option<Role>, currentFunction : Option<Function>) : Bool {
 		var fieldArray = extractIdentifier(e, currentRole);
-		if (fieldArray == null) return;
+		if (fieldArray == null) return false;
 		if (fieldArray[0] == "this") fieldArray.shift();
-		if (fieldArray.length != 1)	return;
+		if (fieldArray.length != 1)	return false;
 		
 		var boundRole = roles.get(fieldArray[0]);
-		if (boundRole == null) return;
+		if (boundRole == null) return false;
 
 		// Set where the Role was bound in the Context.
 		boundRole.bound = e.pos;
@@ -89,7 +106,7 @@ class RoleMethodReplacer
 			case None: Context.error('Role must be bound in a Context method!', e.pos);
 			case Some(f):
 				if (roleBindFunction == null) {
-					roleBindFunction = f;					
+					roleBindFunction = f;
 				}
 				else if (roleBindFunction != f) {
 					Context.warning(
@@ -102,6 +119,8 @@ class RoleMethodReplacer
 					);
 				}
 		}
+		
+		return true;
 	}
 	
 	/**
@@ -115,7 +134,7 @@ class RoleMethodReplacer
 				case EField(e2, field):
 					var replace = switch(currentRole) {
 						case None: field;
-						case Some(r): (field == "self" || field == RoleMethod.roleAccessor) ? r.name : field;
+						case Some(r): (field == RoleMethod.roleAccessor) ? r.name : field;
 					}
 					fields.unshift(replace);
 					e = e2;
@@ -123,7 +142,7 @@ class RoleMethodReplacer
 				case EConst(CIdent(s)):
 					var replace = switch(currentRole)	{
 						case None: s;
-						case Some(r): (s == "self" || s == RoleMethod.roleAccessor) ? r.name : s;
+						case Some(r): (s == RoleMethod.roleAccessor) ? r.name : s;
 					}
 					fields.unshift(replace);
 					return fields;

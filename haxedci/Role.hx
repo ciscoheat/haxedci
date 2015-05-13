@@ -17,7 +17,7 @@ class Role
 	}
 	
 	public var field(default, null) : Field;
-	public var bound(default, default) : Position;
+	public var bound(default, default) : Null<Position>;
 
 	public var name(get, null) : String;
 	function get_name() return field.name;

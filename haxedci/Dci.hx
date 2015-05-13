@@ -6,14 +6,6 @@ import haxe.macro.Expr;
 import haxe.macro.Context;
 import haxe.Serializer;
 import haxe.Unserializer;
-/*
-import haxe.io.Bytes;
-import haxe.io.Path;
-import sys.FileStat;
-import sys.FileSystem;
-import sys.io.File;
-import sys.io.FileOutput;
-*/
 
 using Lambda;
 using StringTools;
@@ -26,64 +18,37 @@ using haxe.macro.MacroStringTools;
  */
 class Dci
 {
-	// "Context-Role" => Field
-	public static var rmSignatures : Map<String, Array<Field>> = new Map<String, Array<Field>>();
-	
-	@macro public static function context() : Array<Field>
-	{
-		// Since the autocompletion cannot resolve all RoleMethods for a Role
-		// unless inside the very last one, save signatures here for usage in
-		// display mode.
-		
-		/*
-		var signatures = Context.defined("dci-signatures") || Context.defined("debug");
+	/**
+	 * System-wide role method collection, to prevent collisions.
+	 */
+	static var allRoleMethods : Map<String, RoleMethod> = new Map<String, RoleMethod>();
 
-		if(signatures && !Context.defined("display")) {
-			Context.onAfterGenerate(function() {
-				var ser = new Serializer();
-				ser.serialize(rmSignatures.array().length);
-				for (key in rmSignatures.keys()) {
-					ser.serialize(key);
-					ser.serialize(rmSignatures.get(key).length);
-					for (field in rmSignatures.get(key)) {
-						// Cannot serialize pos automatically...
-						var p = Context.getPosInfos(field.pos);
-						field.pos = null;
-						ser.serialize(field);
-						ser.serialize(p);
-					}
-				}
+	@macro public static function context() : Array<Field> {
+		// Reset statics that should never be reused.
+		Context.onMacroContextReused(function() {
+			allRoleMethods = new Map<String, RoleMethod>();
+			return true;
+		});
 
-				Context.addResource("dci-signatures", Bytes.ofString(ser.toString()));
-				trace("Compiled rmSignatures: " + rmSignatures.array().length);
-			});
-		}		
-		else if (rmSignatures == null && Context.defined("display")) {
-			rmSignatures = new Map<String, Array<Field>>();
-			try {
-				var un = new Unserializer(haxe.Resource.getString("dci-signatures"));
-				var i = un.unserialize();
-				while (i-- > 0) {
-					var fields = [];
-					rmSignatures.set(un.unserialize(), fields);
-					var i2 = un.unserialize();
-					while (i2-- > 0) {
-						fields.push(un.unserialize());
-						fields[fields.length - 1].pos = Context.makePosition(un.unserialize());
-					}
-				}
-				//Dci.fileTrace("Unserializing rmSignatures: " + rmSignatures.array().length);
-			} catch (e : Dynamic) {}
-		}
-		*/
-		
 		return new Dci().addRoleMethods();
 	}
 
-	/**
-	 * Debugging autocompletion is very tedious, so here's a helper method.
-	 */
-	 /*
+	static function isRoleField(field : Field) {
+		if (!field.meta.exists(function(m) return m.name == "role")) return false;
+		
+		var error = function() {
+			Context.error("@role can only be used on non-static var fields.", field.pos);
+			return false;
+		}
+		
+		switch(field.kind) {
+			case FVar(_, _): return field.access.has(AStatic) ? error() : true;
+			case _: return error();
+		}
+	}
+
+	// Debugging autocompletion is very tedious, so here's a helper method.
+	/*
 	public static function fileTrace(o : Dynamic, ?file : String)
 	{
 		file = Context.definedValue("filetrace");
@@ -99,15 +64,8 @@ class Dci
 
 	//////////////////////////////////////////////////
 	
-	/**
-	 * System-wide role methods, to prevent collisions.
-	 */
-	static var allRoleMethods : Map<String, RoleMethod> = new Map<String, RoleMethod>();
-
 	public var fields(default, null) : Array<Field>;
-
 	public var roles(default, null) : Array<Role>;
-
 	public var roleMethods(default, null) : Array<RoleMethod>;
 
 	var name(default, null) : String;
@@ -122,27 +80,10 @@ class Dci
 		roleMethods = [for(role in roles) for(rm in role.roleMethods) rm];
 	}
 
-	static function isRoleField(field : Field) {
-		if (!field.meta.exists(function(m) return m.name == "role")) return false;
-		var error = function() {
-			Context.error("@role can only be used on non-static var fields.", field.pos);
-			return false;
-		}
-		
-		switch(field.kind) {
-			case FVar(_, _): 
-				return field.access.has(AStatic) ? error() : true;
-			case _:
-				return error();
-		}
-	}
-
 	public function addRoleMethods() : Array<Field>
 	{
 		var roleAccessor = RoleMethod.roleAccessor;
 		var replacer = new RoleMethodReplacer(this);
-
-		//trace("=== Context: " + this.name);
 
 		for(f in fields) {
 			//trace("Adding field " + f.name);
@@ -150,13 +91,12 @@ class Dci
 		}
 
 		for (role in roles) {
-			var roleAliasInjection = [
-				(macro var $roleAccessor = $i{role.name}, self = $i{roleAccessor})
-			];
-			var roleField = role.field;			
+			var roleAliasInjection = [macro var $roleAccessor = $i{role.name}];
+			var roleField = role.field;
+			
 			switch(roleField.kind) {
 				case FVar(t, e):
-					// Removing the RoleMethods from the Field definition so it can be used as a normal Field.					
+					// Removing the RoleMethods from the Field definition so it can be used as a normal Field.
 					roleField.kind = Context.defined("display") 
 						? FVar(new RoleObjectContractTypeMerger(role).mergedType(), null)
 						: FVar(t, null);
@@ -179,7 +119,7 @@ class Dci
 				//trace("Adding roleMethod: " + roleMethod.field.name);
 				fields.push(roleMethod.field);
 
-				// Add "port" to roleMethods
+				// Add "self" to roleMethods
 				var method = roleMethod.method;
 
 				switch(method.expr.expr)	{
@@ -198,8 +138,10 @@ class Dci
 				}
 				#end
 			}
+		}
 
-			// Add to allRoleMethods for name collision testing.
+		// Finally add RoleMethods to allRoleMethods to test for collisions.
+		for(role in roles) {
 			for(roleMethod in role.roleMethods) {
 				allRoleMethods.set(roleMethod.name, roleMethod);
 			}
