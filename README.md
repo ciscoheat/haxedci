@@ -12,12 +12,8 @@ Then put `-lib haxedci` into your hxml.
 ## Example/Demo
 Browse to the [haxedci-example](https://github.com/ciscoheat/haxedci-example) repository for a syntax explanation of the library, a longer introduction to DCI, and a downloadable demo.
 
-## Special features
-Because of the special syntax, there are problems with autocompletion for Roles so it is done through an external file. In your source directory a file called "dci-signatures.bin" will be generated. This only happens in debug mode, and if you want control over the location you can set the flag `-D dci-signatures=your_file.txt` (or even `-D dci-signatures=` if you want to disable it completely.)
-
-There are still some issues with using "this" inside a RoleMethod that seems hard to fix, in case you see some extra methods appended to the Context object.
-
-Finally you will only get autocompletion for RoleMethods if you set a return value explicitly. If you want warnings for the occational slip of mind (also debug mode only), define `-D dci-signatures-warnings`.
+## Notes
+Because of the special syntax, there are some problems with autocompletion for Roles. When inside a Role, not all of its RoleMethods may show up. The compiler seems to stop early. Also you will only get autocompletion for RoleMethods if you set a return value explicitly. If you want warnings for the occational slip of mind (debug mode only), define `-D dci-signatures-warnings`.
 
 ## DCI Resources
 **Recommended:** [DCI – How to get ahead in system architecture](http://www.silexlabs.org/wwx2014-speech-andreas-soderlund-dci-how-to-get-ahead-in-system-architecture/) - My DCI speech.
