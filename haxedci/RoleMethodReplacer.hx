@@ -59,6 +59,11 @@ class RoleMethodReplacer
 				case EConst(CIdent(s)):
 					for (roleName in roles.keys()) if (roleName == s)
 						Context.error("Aliasing a Role isn't allowed, access a Role only through its given name.", e.pos);
+				case EField({expr: EConst(CIdent('this')), pos: _}, field):
+					for (roleName in roles.keys()) if (roleName == field)
+						Context.error("Aliasing a Role isn't allowed, access a Role only through its given name.", e.pos);
+				case EBinop(OpAssign, e1, _):
+					roleAliasTest(e1);
 				case _:
 			}
 		}
@@ -119,6 +124,13 @@ class RoleMethodReplacer
 					);
 				}
 		}
+
+		// Rewrite the Role assignment to the hidden __role variable.
+		switch(e.expr) {
+			case EConst(CIdent(_)): e.expr = EConst(CIdent('__' + boundRole.name));
+			case EField({expr: EConst(CIdent('this')), pos: _}, _): e.expr = EConst(CIdent('__' + boundRole.name));
+			case _: Context.error("Non-obvious Role binding - Use a simpler assigment.", e.pos);
+		}		
 		
 		return true;
 	}

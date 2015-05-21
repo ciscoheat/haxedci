@@ -96,10 +96,29 @@ class Dci
 			
 			switch(roleField.kind) {
 				case FVar(t, e):
-					// Removing the RoleMethods from the Field definition so it can be used as a normal Field.
-					roleField.kind = Context.defined("display") 
-						? FVar(new RoleObjectContractTypeMerger(role).mergedType(), null)
-						: FVar(t, null);
+					if(Context.defined("display"))
+						roleField.kind = FVar(new RoleObjectContractTypeMerger(role).mergedType(), null);						
+					else {
+						// Add a getter to the role field to prevent reassignment of Roles.
+						roleField.kind = FProp('get', 'never', t, null);
+						fields.push({
+							pos: roleField.pos,
+							name: '__' + role.name,
+							meta: [{ pos: roleField.pos, params: [], name: ":noCompletion" }],
+							kind: FVar(t, null)
+						});
+						fields.push({
+							pos: roleField.pos,
+							name: 'get_' + role.name,
+							meta: null,
+							kind: FFun({
+								ret: t,
+								params: null,
+								expr: macro return $i{'__' + role.name},
+								args: []
+							})
+						});
+					}
 				case _:
 					Context.error("Only var fields can be a Role.", roleField.pos);
 			}
