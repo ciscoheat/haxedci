@@ -129,8 +129,8 @@ class RoleMethodReplacer
 		switch(e.expr) {
 			case EConst(CIdent(_)): e.expr = EConst(CIdent('__' + boundRole.name));
 			case EField({expr: EConst(CIdent('this')), pos: _}, _): e.expr = EConst(CIdent('__' + boundRole.name));
-			case _: Context.error("Non-obvious Role binding - Use a simpler assigment.", e.pos);
-		}		
+			case _: Context.error("Non-obvious Role binding - Use a simpler assigment like 'this.role = object'", e.pos);
+		}
 		
 		return true;
 	}
