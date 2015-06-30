@@ -150,12 +150,6 @@ class Dci
 							pos: method.expr.pos
 						};
 				}
-
-				#if debug
-				if (roleMethod.method.ret == null && Context.defined("dci-signatures-warnings")) {
-					Context.warning("RoleMethod without explicit return value", roleMethod.method.expr.pos);
-				}
-				#end
 			}
 		}
 

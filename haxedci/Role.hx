@@ -16,6 +16,7 @@ class Role
 		this.roleMethods = get_roleMethods();
 	}
 	
+	public var type(default, null) : ComplexType;
 	public var field(default, null) : Field;
 	public var bound(default, default) : Null<Position>;
 
@@ -27,8 +28,23 @@ class Role
 		var output = new Map<String, RoleMethod>();
 		switch(field.kind) {
 			case FVar(t, e): 
-				if (t == null)
-					Context.error("A Role var must have a Type as RoleObjectContract.", field.pos);
+				if (t == null) Context.error("A Role must have a Type as RoleObjectContract.", field.pos);
+					
+				switch(t) {
+					// Add Void to anonymous fields if it doesn't exist.
+					case TAnonymous(fields): 
+						for (f in fields) switch f.kind {
+							case FFun(func) if (func.ret == null):
+								if(Context.defined("dci-signatures-warnings"))
+									Context.warning("RoleObjectContract without explicit return value", f.pos);
+								
+								func.ret = TPath( { sub: null, params: null, pack: [], name: "Void" } );
+							case _:
+						}
+						
+					case _:
+				}
+				
 				if(e != null) switch e.expr {
 					case EBlock(exprs): for(e in exprs) switch e.expr {
 						case EFunction(name, f):
@@ -40,6 +56,8 @@ class Role
 					case _: 
 						Context.error("A Role can only be assigned a block of RoleMethods.", e.pos);
 				}
+				
+				type = t;
 			case _:
 				Context.error("Only var fields can be a Role.", field.pos);
 		};

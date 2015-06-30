@@ -1,6 +1,9 @@
 package haxedci;
 
 import haxe.macro.Expr;
+import haxe.macro.Context;
+
+using haxe.macro.ExprTools;
 
 class RoleMethod
 {
@@ -44,5 +47,40 @@ class RoleMethod
 			doc: null,
 			access: [APrivate]
 		};
+		
+		// RoleMethods returns self as default if not specified otherwise.
+		// A compilation warning can be defined to warn for that.
+		if (method.ret == null) {
+			if(Context.defined("dci-signatures-warnings"))
+				Context.warning("RoleMethod without explicit return value", method.expr.pos);
+				
+			// Set type to Role type
+			//method.ret = TPath({sub: null, params: null, pack: [], name: "Void"});
+			method.ret = role.type;
+			
+			// Inject "return self" at return statements
+			var returnSelf = macro return $v{roleAccessor};
+			
+			if (method.expr == null) 
+				method.expr = returnSelf;
+			else {
+				method.expr.expr = switch method.expr.expr {
+					case EBlock(exprs):
+						exprs.push(returnSelf);
+						method.expr.expr;
+					case _:
+						EBlock([method.expr, returnSelf]);
+				}
+	
+				injectReturnSelf(method.expr);
+			}
+		}
+	}
+	
+	function injectReturnSelf(e : Expr) {
+		return switch e.expr {
+			case EReturn(e) if (e == null): macro return $v{roleAccessor};
+			case _: e.map(injectReturnSelf);
+		}
 	}
 }
