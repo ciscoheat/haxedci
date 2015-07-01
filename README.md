@@ -18,7 +18,7 @@ Install via [haxelib](http://haxe.org/doc/haxelib/using_haxelib): `haxelib insta
 Then put `-lib haxedci` into your hxml.
 
 ## Technical notes
-Because of the special syntax, there are some problems with autocompletion for Roles. When inside a Role, not all of its RoleMethods may show up. The compiler seems to stop early. Also you will only get autocompletion for RoleMethods if you set a return value explicitly. If you want warnings for the occational slip of mind (debug mode only), define `-D dci-signatures-warnings`.
+Because of the special syntax, there are some problems with autocompletion for Roles. When inside a Role, not all of its RoleMethods may show up. The compiler seems to stop too early.
 
 ## DCI Resources
 **Recommended:** [DCI – How to get ahead in system architecture](http://www.silexlabs.org/wwx2014-speech-andreas-soderlund-dci-how-to-get-ahead-in-system-architecture/) - My DCI speech.
