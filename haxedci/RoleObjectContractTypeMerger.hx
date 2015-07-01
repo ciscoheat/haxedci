@@ -36,9 +36,12 @@ class RoleObjectContractTypeMerger
 				//trace("TAnonymous, merge with RoleObjectContract.");
 				return mergeAnonymousInterfaces(fields);
 
+			// "Structurally extending classes is deprecated and will be removed"
+			/*
 			case TPath(p):
 				//trace('TPath: ' + p.pack.toDotPath(p.name));
 				return mergeTypeAndRoleObjectContract(complexType.toType(), p);
+			*/
 
 			case _:
 				// If in display mode, the type is merged and should be displayed.

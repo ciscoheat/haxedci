@@ -59,17 +59,21 @@ class RoleMethod
 			method.ret = role.type;
 			
 			// Inject "return self" at return statements
-			var returnSelf = macro return $v{roleAccessor};
+			var returnSelf = (macro return $v{roleAccessor}).expr;
 			
-			if (method.expr == null) 
-				method.expr = returnSelf;
+			if (method.expr == null) {
+				method.expr = {
+					expr: returnSelf,
+					pos: method.expr.pos
+				}
+			}
 			else {
 				method.expr.expr = switch method.expr.expr {
 					case EBlock(exprs):
-						exprs.push(returnSelf);
+						exprs.push({expr: returnSelf, pos: method.expr.pos});
 						method.expr.expr;
 					case _:
-						EBlock([method.expr, returnSelf]);
+						EBlock([method.expr, {expr: returnSelf, pos: method.expr.pos}]);
 				}
 	
 				injectReturnSelf(method.expr);
