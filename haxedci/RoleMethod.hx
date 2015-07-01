@@ -55,18 +55,14 @@ class RoleMethod
 				Context.warning("RoleMethod without explicit return value", method.expr.pos);
 				
 			// Set type to Role type
-			//method.ret = TPath({sub: null, params: null, pack: [], name: "Void"});
 			method.ret = role.type;
+			//method.ret = TPath({sub: null, params: null, pack: [], name: "Void"});
 			
 			// Inject "return self" at return statements
-			var returnSelf = (macro return $v{roleAccessor}).expr;
+			var returnSelf = (macro return $i{roleAccessor}).expr;
 			
-			if (method.expr == null) {
-				method.expr = {
-					expr: returnSelf,
-					pos: method.expr.pos
-				}
-			}
+			if (method.expr == null)
+				method.expr = {	expr: returnSelf, pos: field.pos };
 			else {
 				method.expr.expr = switch method.expr.expr {
 					case EBlock(exprs):
@@ -75,16 +71,18 @@ class RoleMethod
 					case _:
 						EBlock([method.expr, {expr: returnSelf, pos: method.expr.pos}]);
 				}
-	
+				
 				injectReturnSelf(method.expr);
 			}
 		}
 	}
 	
 	function injectReturnSelf(e : Expr) {
-		return switch e.expr {
-			case EReturn(e) if (e == null): macro return $v{roleAccessor};
-			case _: e.map(injectReturnSelf);
+		switch e.expr {
+			case EReturn(e2) if (e2 == null): 
+				e.expr = (macro return $i{roleAccessor}).expr;
+			case _: 
+				e.iter(injectReturnSelf);
 		}
 	}
 }

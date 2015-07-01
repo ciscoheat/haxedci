@@ -13,12 +13,16 @@ class Role
 		
 		this.field = field;
 		this.bound = null;
+		this.type = switch field.kind {
+			case FVar(t, _): t;
+			case _: Context.error("Only var fields can be a Role.", field.pos);
+		}
 		this.roleMethods = get_roleMethods();
 	}
 	
-	public var type(default, null) : ComplexType;
 	public var field(default, null) : Field;
 	public var bound(default, default) : Null<Position>;
+	public var type(default, null) : ComplexType;
 
 	public var name(get, null) : String;
 	function get_name() return field.name;
@@ -56,8 +60,6 @@ class Role
 					case _: 
 						Context.error("A Role can only be assigned a block of RoleMethods.", e.pos);
 				}
-				
-				type = t;
 			case _:
 				Context.error("Only var fields can be a Role.", field.pos);
 		};
