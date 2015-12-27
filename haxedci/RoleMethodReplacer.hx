@@ -91,7 +91,7 @@ class RoleMethodReplacer
 	}
 
 	function testIdentifiersInRoleMethods(name : String, e : Expr) {
-		if(name == "this") Context.error('"this" keyword is not allowed in RoleMethods, reference the field directly instead.', e.pos);
+		if(name == "this") Context.error('"this" keyword is not allowed in RoleMethods, use "self" or reference the field directly instead.', e.pos);
 	}
 
 	// Returns true if a Role was successfully bound in the Expr.

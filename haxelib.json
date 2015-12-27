@@ -4,7 +4,7 @@
   "license": "MIT",
   "tags": ["cross", "dci"],
   "description": "A DCI library with clean syntax and autocompletion.",
-  "version": "0.10.3",
-  "releasenote": "Removed old information from README.",
+  "version": "0.11.0",
+  "releasenote": "RoleMethod collisions in different Contexts are now allowed again.",
   "contributors": ["ciscoheat"]
 }

@@ -128,11 +128,13 @@ class Dci
 
 			// Add the RoleMethods
 			for (roleMethod in role.roleMethods) {
+				/*
 				if(allRoleMethods.exists(roleMethod.name) && !Context.defined("dci-allow-name-collisions")) {
 					var error = "RoleMethod name collision - cannot have same RoleMethod names in different Contexts.";
 					Context.warning(error, roleMethod.field.pos);
 					Context.error(error, allRoleMethods.get(roleMethod.name).field.pos);
 				}
+				*/
 
 				replacer.replaceRoleMethod(roleMethod);
 				//trace("Adding roleMethod: " + roleMethod.field.name);
