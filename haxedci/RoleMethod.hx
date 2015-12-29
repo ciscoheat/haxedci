@@ -21,6 +21,8 @@ class RoleMethod
 	public var field : Field;
 	public var signature : Field;
 	
+	function returnSelf(pos : Position) return {expr: EReturn({expr: EConst(CIdent(roleAccessor)), pos: pos}), pos: pos};
+
 	public function new(role : Role, name : String, method : Function) {
 		this.role = role;
 		this.method = method;
@@ -53,36 +55,39 @@ class RoleMethod
 		if (method.ret == null) {
 			if(Context.defined("dci-signatures-warnings"))
 				Context.warning("RoleMethod without explicit return value", method.expr.pos);
+
+			// TODO: Create typedef if role.type is TAnonymous
+			//trace(field.name);
+			//trace(method.ret);
 				
 			// Set type to Role type
 			method.ret = role.type;
-			//method.ret = TPath({sub: null, params: null, pack: [], name: "Void"});
-			
-			// Inject "return self" at return statements
-			var returnSelf = (macro return $i{roleAccessor}).expr;
-			
+
+			// Add return to block, or create a block with return statement
 			if (method.expr == null)
-				method.expr = {	expr: returnSelf, pos: field.pos };
+				method.expr = returnSelf(field.pos);
 			else {
-				method.expr.expr = switch method.expr.expr {
+				switch method.expr.expr {
 					case EBlock(exprs):
-						exprs.push({expr: returnSelf, pos: method.expr.pos});
-						method.expr.expr;
+						exprs.push(returnSelf(method.expr.pos));
 					case _:
-						EBlock([method.expr, {expr: returnSelf, pos: method.expr.pos}]);
+						method.expr = {
+							expr: EBlock([method.expr, returnSelf(method.expr.pos)]), 
+							pos: method.expr.pos
+						};
 				}
-				
-				injectReturnSelf(method.expr);
 			}
+
+			// Replace all empty return statements with return self
+			method.expr = injectReturnSelf(method.expr);
 		}
 	}
 	
-	function injectReturnSelf(e : Expr) {
-		switch e.expr {
-			case EReturn(e2) if (e2 == null): 
-				e.expr = (macro return $i{roleAccessor}).expr;
-			case _: 
-				e.iter(injectReturnSelf);
+	function injectReturnSelf(e : Expr) : Expr {
+		return switch e.expr {
+			case EReturn(e2) if (e2 == null): returnSelf(e.pos);
+			case EFunction(_, _): e;
+			case _: e.map(injectReturnSelf);
 		}
 	}
 }
