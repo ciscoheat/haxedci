@@ -56,10 +56,6 @@ class RoleMethod
 			if(Context.defined("dci-signatures-warnings"))
 				Context.warning("RoleMethod without explicit return value", method.expr.pos);
 
-			// TODO: Create typedef if role.type is TAnonymous
-			//trace(field.name);
-			//trace(method.ret);
-				
 			// Set type to Role type
 			method.ret = role.type;
 

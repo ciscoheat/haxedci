@@ -13,10 +13,13 @@ class RoleObjectContractTypeMerger
 {
 	var complexType : ComplexType;
 	var role : Role;
+	var context : Dci;
 
-	public function new(role : Role) {
+	public function new(role : Role, context : Dci) {
 		if (role == null) throw "role cannot be null.";
+		if (context == null) throw "context cannot be null.";
 		this.role = role;
+		this.context = context;
 		
 		switch(role.field.kind) {
 			case FVar(t, _): this.complexType = t;

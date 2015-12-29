@@ -54,9 +54,9 @@ class Dci
 		file = Context.definedValue("filetrace");
 		if (file == null) file = "e:\\temp\\filetrace.txt";
 		
-		var f : FileOutput;
-		try f = File.append(file, false)
-		catch (e : Dynamic) f = File.write(file, false);
+		var f : sys.io.FileOutput;
+		try f = sys.io.File.append(file, false)
+		catch (e : Dynamic) f = sys.io.File.write(file, false);
 		f.writeString(Std.string(o) + "\n");
 		f.close();
 	}
@@ -68,7 +68,7 @@ class Dci
 	public var roles(default, null) : Array<Role>;
 	public var roleMethods(default, null) : Array<RoleMethod>;
 
-	var name(default, null) : String;
+	public var name(default, null) : String;
 
 	public function new()
 	{
@@ -97,7 +97,7 @@ class Dci
 			switch(roleField.kind) {
 				case FVar(t, e):
 					if(Context.defined("display"))
-						roleField.kind = FVar(new RoleObjectContractTypeMerger(role).mergedType(), null);						
+						roleField.kind = FVar(new RoleObjectContractTypeMerger(role, this).mergedType(), null);						
 					else {
 						// Add a getter to the role field to prevent reassignment of Roles.
 						roleField.kind = FProp('get', 'never', t, null);
@@ -156,11 +156,13 @@ class Dci
 		}
 
 		// Finally add RoleMethods to allRoleMethods to test for collisions.
+		/*
 		for(role in roles) {
 			for(roleMethod in role.roleMethods) {
 				allRoleMethods.set(roleMethod.name, roleMethod);
 			}
 		}
+		*/
 
 		// After all replacement is done, test if all roles are bound.
 		if(!Context.defined("display")) {
