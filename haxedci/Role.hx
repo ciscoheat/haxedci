@@ -27,12 +27,16 @@ class Role
 	public var name(get, null) : String;
 	function get_name() return field.name;
 
+	private function incorrectTypeError() Context.error("A Role must have an anonymous structure as its RoleObjectContract. See http://haxe.org/manual/types-anonymous-structure.html for syntax.", field.pos);
+	private function basicTypeError(name) Context.error(name + " is a basic type, only objects can play a Role in a Context. You can make it a normal field instead, or pass it as a parameter.", field.pos);
+
 	public var roleMethods(default, null) : Map<String, RoleMethod>;
 	function get_roleMethods() {
 		var output = new Map<String, RoleMethod>();
 		switch(field.kind) {
 			case FVar(t, e): 
-				if (t == null) Context.error("A Role must have a Type as RoleObjectContract.", field.pos);
+				
+				if (t == null) incorrectTypeError();
 					
 				switch(t) {
 					// Add Void to anonymous fields if it doesn't exist.
@@ -45,8 +49,13 @@ class Role
 								func.ret = TPath( { sub: null, params: null, pack: [], name: "Void" } );
 							case _:
 						}
+
+					case TPath( { name: "Int", pack: [], params: [] } ): basicTypeError("Int");
+					case TPath( { name: "Bool", pack: [], params: [] } ): basicTypeError("Bool");
+					case TPath( { name: "Float", pack: [], params: [] } ): basicTypeError("Float");
 						
-					case _:
+					case _: 
+						incorrectTypeError();
 				}
 				
 				if(e != null) switch e.expr {
