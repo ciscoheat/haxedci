@@ -11,25 +11,9 @@ using Lambda;
 using StringTools;
 using haxe.macro.MacroStringTools;
 
-/**
- * A syntax-level DCI Context. This means that concepts like a Role
- * Aren't a true DCI Role, more like how a programmer that implements DCI
- * would think about a Role.
- */
 class Dci
 {
-	/**
-	 * System-wide role method collection, to prevent collisions.
-	 */
-	static var allRoleMethods : Map<String, RoleMethod> = new Map<String, RoleMethod>();
-
 	@macro public static function context() : Array<Field> {
-		// Reset statics that should never be reused.
-		Context.onMacroContextReused(function() {
-			allRoleMethods = new Map<String, RoleMethod>();
-			return true;
-		});
-
 		return new Dci().addRoleMethods();
 	}
 
