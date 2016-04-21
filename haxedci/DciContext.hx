@@ -42,7 +42,7 @@ class DciRole {
 			pos: field.pos,
 			name: field.name,
 			meta: null,
-			kind: FVar(fieldType, null),
+			kind: FVar(fieldType, null), // Important to set expr to null, to remove the body code
 			doc: null,
 			access: [APrivate]
 		};

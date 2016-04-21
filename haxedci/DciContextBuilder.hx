@@ -50,18 +50,17 @@ class DciContextBuilder
 		// Fix return types of contracts (try to type, or set to Void if not exists)
 		// It must be done after rewriting RoleMethod calls, otherwise the compiler could fail
 		// on "self" calls, for example.
+		/*
 		for (role in context.roles) for(contractField in role.contract) switch contractField.kind {
-			case FFun(f): 
-				trace("=== ContractField: " + contractField.name);
-				//f.ret = functionType(f);
+			case FFun(f): f.ret = functionType(f);
 			case _:
 		}
+		*/
 		
 		var outputFields = context.fields.concat(context.roles.map(function(role) return role.field));
 		
 		// Create fields for the RoleMethods
 		for (role in context.roles) for (roleMethod in role.roleMethods) {
-			trace("Creating RoleMethod field: " + role.name + '__' + roleMethod.name);
 			outputFields.push({
 				pos: roleMethod.method.expr.pos,
 				name: role.name + '__' + roleMethod.name,

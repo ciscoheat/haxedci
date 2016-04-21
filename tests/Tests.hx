@@ -47,14 +47,14 @@ class MoneyTransfer implements haxedci.Context {
     }
 
     public function transfer() {
-        source.withdraw();
+        this.source.withdraw();
     }
 
     @role var source : {
         function decreaseBalance(a : Int) : Void;
     } =
     {
-        function withdraw() : Void {
+        function withdraw() {
             self.decreaseBalance(amount);
             destination.deposit();
         }
@@ -64,8 +64,9 @@ class MoneyTransfer implements haxedci.Context {
         function increaseBalance(a : Int) : Void;
     } =
     {
-        function deposit() : Void {
+        function deposit() {
             self.increaseBalance(amount);
+			return true;
         }
     }
 

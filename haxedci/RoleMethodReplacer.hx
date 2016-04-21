@@ -45,7 +45,7 @@ class RoleMethodReplacer
 		for (role in roles) replaceRole(role);
 		for (field in context.fields) replaceField(field);
 		
-		trace("=== Fields rewritten for Context ==="); for (role in roles) for(rm in role.roleMethods) trace(rm.method.expr.toString());
+		//trace("=== Fields rewritten for Context ==="); for (role in roles) for(rm in role.roleMethods) trace(rm.method.expr.toString());
 	}
 
 	function replaceRole(role : DciRole) {
@@ -65,51 +65,18 @@ class RoleMethodReplacer
 	function replaceInExpr(e : Expr, currentRole : Option<DciRole>, currentFunction : Option<Function>) {
 		var hasRole = !currentRole.equals(Option.None);
 		
-		/*
-		function roleAliasTest(e2 : Expr) {
-			if (e2 == null) return;
-			switch(e2.expr) {
-				case EParenthesis(e3): roleAliasTest(e3);
-				case EConst(CIdent(s)):
-					for (roleName in roles.keys()) if (roleName == s)
-						Context.error("Aliasing a Role isn't allowed, access a Role only through its given name.", e.pos);
-				case EField({expr: EConst(CIdent('this')), pos: _}, field):
-					for (roleName in roles.keys()) if (roleName == field)
-						Context.error("Aliasing a Role isn't allowed, access a Role only through its given name.", e.pos);
-				case EBinop(OpAssign, e1, _):
-					roleAliasTest(e1);
-				case _:
-			}
-		}
-		*/
-		
 		switch(e.expr) {
 			case EFunction(_, f) if(f.expr != null): 
 				replaceInExpr(f.expr, currentRole, Some(f)); return;
-			case EConst(CIdent(name)): 
-				//if(hasRole) testIdentifiersInRoleMethods(name, e);
 			case EField(e2, name): 
-				//if(hasRole) testIdentifiersInRoleMethods(name, e2);
 				if(replaceIdentifiers(e, currentRole)) return;
 			case EBinop(OpAssign, e1, e2): 
-				if (!setRoleBindPos(e1, currentRole, currentFunction)) {
-					// Role wasn't bound, so test if something is being assigned to it. That's not allowed.
-					//roleAliasTest(e2);
-				}
-			case EVars(vars):
-				//for (v in vars) roleAliasTest(v.expr);
+				setRoleBindPos(e1, currentRole, currentFunction);
 			case _:
 		}
 
 		e.iter(replaceInExpr.bind(_, currentRole, currentFunction));
 	}
-
-	/*
-	function testIdentifiersInRoleMethods(name : String, e : Expr) {
-		if (name == "this") Context.error('"this" keyword is not allowed in RoleMethods, use "self" or reference the Role directly instead.', e.pos);
-		//if (!roleNames.has(name)) Context.error("RoleMethods can only reference its own or another Role.", e.pos);
-	}
-	*/
 
 	// Returns true if a Role was successfully bound in the Expr.
 	function setRoleBindPos(e : Expr, currentRole : Option<DciRole>, currentFunction : Option<Function>) : Bool {
@@ -124,7 +91,7 @@ class RoleMethodReplacer
 		// Set where the Role was bound in the Context.
 		boundRole.bound = e.pos;
 
-		switch(currentFunction) {
+		return switch(currentFunction) {
 			case None: 
 				Context.error('Role must be bound in a Context method!', e.pos);
 				
@@ -141,18 +108,8 @@ class RoleMethodReplacer
 						e.pos
 					);
 				}
+				true;
 		}
-
-		// Rewrite the Role assignment to the hidden __role variable.
-		/*
-		switch(e.expr) {
-			case EConst(CIdent(_)): e.expr = EConst(CIdent('__' + boundRole.name));
-			case EField({expr: EConst(CIdent('this')), pos: _}, _): e.expr = EConst(CIdent('__' + boundRole.name));
-			case _: Context.error("Non-obvious Role binding - Use a simpler assigment like 'this.role = object'", e.pos);
-		}
-		*/
-		
-		return true;
 	}
 	
 	/**
@@ -161,9 +118,8 @@ class RoleMethodReplacer
 	 */
 	function extractIdentifier(e : Expr, currentRole : Option<DciRole>) : Null<Array<String>> {
 		return switch(e.expr) {
-			case EField(e2, field): e.toString().split(".");
-			case EConst(CIdent(s)): [s];
-			case _:	return null;
+			case EField(_, _): e.toString().split(".");
+			case _:	null;
 		}
 	}
 
@@ -179,10 +135,16 @@ class RoleMethodReplacer
 		}
 		
 		switch fieldArray[0] {
-			case "this" if (currentRole != null):
-				Context.error('"this" keyword is not allowed in RoleMethods, use "self" or reference the Role directly instead.', e.pos);
+			case "this":
+				if (currentRole != null)
+					Context.error('"this" keyword is not allowed in RoleMethods, use "self" or reference the Role directly instead.', e.pos);
+				else {
+					fieldArray.shift(); // Remove "this", if 1 or 0 length then there's no need to rename.
+					if (fieldArray.length <= 1) return false;
+				}
 				
 			case "self" if (currentRole != null):
+				// Rename self to the actual role name
 				fieldArray[0] = currentRole.name;
 				
 			case _:
@@ -191,9 +153,12 @@ class RoleMethodReplacer
 		var potentialRole = fieldArray[0];
 		
 		// Test if the field refers to a RoleMethod in the current Role, then prepend the current role.
-		if (fieldArray.length == 1 && currentRole.name != "") {
-			if(roleMethodNames.get(currentRole.name).has(potentialRole) || currentRole.contract.find(function(f) return f.name == potentialRole) != null)
+		if (fieldArray.length == 1) {
+			if (roleMethodNames.get(currentRole.name).has(potentialRole) ||
+				currentRole.contract.find(function(f) return f.name == potentialRole) != null) 
+			{					
 				fieldArray.unshift(currentRole.name);
+			}
 		}
 
 		// Rewrite only if a RoleMethod is refered
@@ -205,7 +170,7 @@ class RoleMethodReplacer
 			fieldArray.shift();
 		}
 
-		trace(fieldArray);
+		//trace(fieldArray);
 		
 		e.expr = (macro $p{fieldArray}).expr;
 		return true;
