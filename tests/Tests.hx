@@ -1,5 +1,3 @@
-package tests;
-
 import buddy.*;
 using buddy.Should;
 

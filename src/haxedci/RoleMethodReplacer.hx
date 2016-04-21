@@ -1,11 +1,10 @@
 package haxedci;
+#if macro
+
 import haxedci.DciContext.DciRole;
 import haxedci.DciContext.DciRoleMethod;
 
-#if macro
 import haxe.ds.Option;
-import sys.io.File;
-import sys.io.FileOutput;
 import haxe.macro.Expr;
 import haxe.macro.Context;
 

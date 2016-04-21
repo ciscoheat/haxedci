@@ -15,14 +15,15 @@
   </output>
   <!-- Other classes to be compiled into your SWF -->
   <classpaths>
-    <class path="" />
+    <class path="src" />
+    <class path="tests" />
   </classpaths>
   <!-- Build options -->
   <build>
     <option directives="" />
     <option flashStrict="False" />
     <option noInlineOnDebug="False" />
-    <option mainClass="tests.Tests" />
+    <option mainClass="Tests" />
     <option enabledebug="False" />
     <option additional="" />
   </build>

@@ -1,5 +1,6 @@
 package haxedci;
 
+#if macro
 import haxe.ds.Option;
 import haxe.macro.Compiler;
 import haxe.macro.Expr;
@@ -33,9 +34,6 @@ class DciContextBuilder
 	//////////////////////////////////////////////////
 	
 	public static function build() : Array<Field> {
-		//var cls = Context.getLocalClass().get();
-		//name = cls.pack.toDotPath(cls.name);
-		
 		var contextFields = Context.getBuildFields();
 
 		// Create the Context
@@ -71,6 +69,11 @@ class DciContextBuilder
 			});
 		}
 		
+		// After all replacement is done, test if all roles are bound.
+		for (r in context.roles) if(r.bound == null) {
+			Context.warning("Role " + r.name + " isn't bound in this Context.", r.field.pos);
+		}
+				
 		return outputFields;
 	}
 
@@ -150,83 +153,5 @@ class DciContextBuilder
 				Context.error("Only var fields can be a Role.", field.pos);
 		}
 	}
-
-	/*
-	public function addRoleMethods() : Array<Field>
-	{
-		var roleAccessor = RoleMethod.roleAccessor;
-		var replacer = new RoleMethodReplacer(this);
-
-		for(f in fields) {
-			//trace("Adding field " + f.name);
-			replacer.replaceField(f);
-		}
-
-		for (role in roles) {
-			var roleAliasInjection = [macro var $roleAccessor = $i{role.name}];
-			var roleField = role.field;
-			
-			switch(roleField.kind) {
-				case FVar(t, e):
-					if(Context.defined("display"))
-						roleField.kind = FVar(new RoleObjectContractTypeMerger(role, this).mergedType(), null);						
-					else {
-						// Add a getter to the role field to prevent reassignment of Roles.
-						roleField.kind = FProp('get', 'never', t, null);
-						fields.push({
-							pos: roleField.pos,
-							name: '__' + role.name,
-							meta: [{ pos: roleField.pos, params: [], name: ":noCompletion" }],
-							kind: FVar(t, null)
-						});
-						fields.push({
-							pos: roleField.pos,
-							name: 'get_' + role.name,
-							meta: null,
-							kind: FFun({
-								ret: t,
-								params: null,
-								expr: macro return $i{'__' + role.name},
-								args: []
-							})
-						});
-					}
-				case _:
-					Context.error("Only var fields can be a Role.", roleField.pos);
-			}
-			
-			//trace("Adding role: " + roleField.name);
-			fields.push(roleField);
-
-			// Add the RoleMethods
-			for (roleMethod in role.roleMethods) {
-
-				replacer.replaceRoleMethod(roleMethod);
-				//trace("Adding roleMethod: " + roleMethod.field.name);
-				fields.push(roleMethod.field);
-
-				// Add "self" to roleMethods
-				var method = roleMethod.method;
-
-				switch(method.expr.expr)	{
-					case EBlock(exprs): 
-						for(expr in roleAliasInjection) exprs.unshift(expr);
-					case _:
-						method.expr = {
-							expr: EBlock(roleAliasInjection.concat([method.expr])), 
-							pos: method.expr.pos
-						};
-				}
-			}
-		}
-
-		// After all replacement is done, test if all roles are bound.
-		if(!Context.defined("display")) {
-			for (r in roles) if(r.bound == null)
-				Context.warning("Role " + r.name + " isn't bound in this Context.", r.field.pos);
-		}
-		
-		return fields;
-	}
-	*/
 }
+#end

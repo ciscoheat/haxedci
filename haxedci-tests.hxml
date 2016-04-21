@@ -1,4 +1,5 @@
 -lib buddy
--cp .
--main tests.Tests
+-cp src
+-cp tests
+-main Tests
 -neko bin/haxedci-tests.n
