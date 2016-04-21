@@ -1,0 +1,4 @@
+-lib buddy
+-cp .
+-main tests.Tests
+-neko bin/haxedci-tests.n
