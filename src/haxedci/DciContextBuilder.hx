@@ -12,12 +12,12 @@ import haxedci.DciContext.DciRoleMethod;
 
 using Lambda;
 using StringTools;
+using haxe.macro.ExprTools;
 using haxe.macro.MacroStringTools;
 
 class DciContextBuilder
 {
 	// Debugging autocompletion is very tedious, so here's a helper method.
-	/*
 	public static function fileTrace(o : Dynamic, ?file : String)
 	{
 		file = Context.definedValue("filetrace");
@@ -29,7 +29,6 @@ class DciContextBuilder
 		f.writeString(Std.string(o) + "\n");
 		f.close();
 	}
-	*/
 
 	//////////////////////////////////////////////////
 	
@@ -42,18 +41,34 @@ class DciContextBuilder
 			contextFields.filter(isRoleField).map(fieldToRole)
 		);
 
+		function showMethodsFor(e : Expr, roleName : String) {
+			var role = context.roles.find(function(r) return r.name == roleName);
+			if (role != null) fileTrace(role.name);
+		}
+		
+		function displayCorrectMethods(e : Expr) {
+			switch e.expr {
+				case EDisplay(e2, isCall): 
+					switch e2.expr {
+						case EConst(CIdent(s)) | EField({expr: EConst(CIdent("this")), pos: _}, s):
+							showMethodsFor(e2, s);
+						case _:
+					}					
+				case _:
+			}
+			
+			e.iter(displayCorrectMethods);
+		}
+
+		if (Context.defined("display")) {
+			for (f in context.fields) switch f.kind {
+				case FFun(f): displayCorrectMethods(f.expr);
+				case _:
+			}
+		}
+
 		// Rewrite RoleMethod calls (destination.deposit -> destination__desposit)
 		new RoleMethodReplacer(context).replaceAll();
-		
-		// Fix return types of contracts (try to type, or set to Void if not exists)
-		// It must be done after rewriting RoleMethod calls, otherwise the compiler could fail
-		// on "self" calls, for example.
-		/*
-		for (role in context.roles) for(contractField in role.contract) switch contractField.kind {
-			case FFun(f): f.ret = functionType(f);
-			case _:
-		}
-		*/
 		
 		var outputFields = context.fields.concat(context.roles.map(function(role) return role.field));
 		
@@ -98,22 +113,18 @@ class DciContextBuilder
 		return if (func.ret != null) {
 			func.ret;
 		} else if (func.expr == null) {
-			trace("No function type, returning void");
 			void;
 		} else try {
-			var type = Context.toComplexType(Context.typeof(func.expr));
-			trace("Parsed type to " + type);
-			type;
+			Context.toComplexType(Context.typeof(func.expr));
 		} catch (e : Dynamic) {
-			trace("RoleMethod typing error: " + e);
-			trace(func);
 			void;
 		}
 	}
 	
 	static function fieldToRole(field : Field) : DciRole {
 		function incorrectTypeError() {
-			Context.error("A Role must have an anonymous structure as its contract. See http://haxe.org/manual/types-anonymous-structure.html for syntax.", field.pos);
+			Context.error("A Role must have an anonymous structure as its contract. " +
+				"See http://haxe.org/manual/types-anonymous-structure.html for syntax.", field.pos);
 		}
 		function basicTypeError(name) {
 			Context.error(name + " is a basic type (Int, Bool, Float), only objects can play a Role in a Context. " + 
@@ -121,11 +132,11 @@ class DciContextBuilder
 		}
 		
 		return switch field.kind {
-			case FVar(t, e): 				
+			case FVar(t, e):
 				if (t == null) incorrectTypeError();
 
 				switch(t) {
-					case TAnonymous(fields): // OK
+					case TAnonymous(fields): // The only correct option
 
 					case TPath( { name: "Int", pack: [], params: [] } ): basicTypeError("Int");
 					case TPath( { name: "Bool", pack: [], params: [] } ): basicTypeError("Bool");
