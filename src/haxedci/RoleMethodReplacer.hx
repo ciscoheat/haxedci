@@ -1,7 +1,7 @@
 package haxedci;
-import haxe.macro.Format;
-#if macro
 
+#if macro
+import haxe.macro.Format;
 import haxedci.DciContext;
 import haxedci.DciContext.DciRole;
 import haxedci.DciContext.DciRoleMethod;
@@ -79,15 +79,9 @@ class RoleMethodReplacer
 			case EConst(CIdent(s)) if (s == "self" && role != null):				
 				// self is special, should be changed to current role.
 				e.expr = EConst(CIdent(role.name));
-				return;
-			case EConst(CString(s)) if (s == "self" && role != null):
-				trace(s);
-				// self is special, should be changed to current role.
+			case EConst(CString(s)) if (role != null && e.toString().charAt(0) == "'"):
+				// Interpolation strings must be expanded and iterated, in case "self" is hidden there.
 				e.expr = Format.format(e).expr;
-				trace(e.expr);
-				replaceInExpr(e, currentRole, currentFunction);
-				return;
-
 			case EBinop(OpAssign, e1, e2): 
 				// Potential role bindings, check if all are bound in same function
 				setRoleBindPos(e1, currentRole, currentFunction);
@@ -179,16 +173,11 @@ class RoleMethodReplacer
 				if (currentRole != null)
 					Context.error('"this" keyword is not allowed in RoleMethods, use "self" or reference the Role directly instead.', e.pos);
 				else {
-					fieldArray.shift(); // Remove "this", if 1 or 0 length then there's no need to rename.
+					// Remove "this", then if 1 or 0 length then there's no need to rename.
+					fieldArray.shift(); 
 					if (fieldArray.length <= 1) return false;
 				}
 
-			/*
-			case "self" if (currentRole != null):
-				// Rename self to the actual role name
-				fieldArray[0] = currentRole.name;
-			*/
-				
 			case _:
 		}
 		
@@ -203,9 +192,9 @@ class RoleMethodReplacer
 			}
 		}
 
-		// Rewrite only if a RoleMethod is refered
 		var potentialRoleMethod = fieldArray[1];
 		
+		// Rewrite only if a RoleMethod is referred to
 		if (roles.exists(potentialRole) && roleMethodNames.get(potentialRole).has(potentialRoleMethod)) {
 			// Concatename the first and second fields.
 			fieldArray[1] = potentialRole + "__" + potentialRoleMethod;

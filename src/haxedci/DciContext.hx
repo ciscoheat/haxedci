@@ -1,6 +1,5 @@
 package haxedci;
 
-#if macro
 import haxe.macro.Expr;
 
 class DciContext {
@@ -64,4 +63,3 @@ class DciRoleMethod {
 		this.method = method;
 	}	
 }
-#end
