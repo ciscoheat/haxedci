@@ -37,7 +37,7 @@ class Account {
     }
 }
 
-class MoneyTransfer implements haxedci.Context {
+class MoneyTransfer implements dci.Context {
     public function new(source, destination, amount) {
         this.source = source;
         this.destination = destination;

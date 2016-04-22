@@ -1,6 +1,8 @@
 package haxedci;
+import haxe.macro.Format;
 #if macro
 
+import haxedci.DciContext;
 import haxedci.DciContext.DciRole;
 import haxedci.DciContext.DciRoleMethod;
 
@@ -62,14 +64,32 @@ class RoleMethodReplacer
 	}
 
 	function replaceInExpr(e : Expr, currentRole : Option<DciRole>, currentFunction : Option<Function>) {
-		var hasRole = !currentRole.equals(Option.None);
+		var role = switch currentRole {
+			case None: null;
+			case Some(role): role;
+		};
 		
 		switch(e.expr) {
-			case EFunction(_, f) if(f.expr != null): 
+			case EFunction(_, f) if (f.expr != null): 
+				// Change function, to check for role bindings is same function
 				replaceInExpr(f.expr, currentRole, Some(f)); return;
-			case EField(e2, name): 
-				if(replaceIdentifiers(e, currentRole)) return;
+			case EField(_, _): 
+				// Fields could be changed to role__method
+				if (replaceIdentifiers(e, currentRole)) return;
+			case EConst(CIdent(s)) if (s == "self" && role != null):				
+				// self is special, should be changed to current role.
+				e.expr = EConst(CIdent(role.name));
+				return;
+			case EConst(CString(s)) if (s == "self" && role != null):
+				trace(s);
+				// self is special, should be changed to current role.
+				e.expr = Format.format(e).expr;
+				trace(e.expr);
+				replaceInExpr(e, currentRole, currentFunction);
+				return;
+
 			case EBinop(OpAssign, e1, e2): 
+				// Potential role bindings, check if all are bound in same function
 				setRoleBindPos(e1, currentRole, currentFunction);
 			case _:
 		}
@@ -116,18 +136,39 @@ class RoleMethodReplacer
 	 * or null if the expression isn't an EField or EConst.
 	 */
 	function extractIdentifier(e : Expr, currentRole : Option<DciRole>) : Null<Array<String>> {
-		return switch(e.expr) {
-			case EField(_, _): e.toString().split(".");
-			case _:	null;
+		var fields = [];
+		while (true) {
+			switch(e.expr) {
+				case EField(e2, field):
+					var replace = switch(currentRole) {
+						case None: field;
+						case Some(r): (field == "self") ? r.name : field;
+					}
+					fields.unshift(replace);
+					e = e2;
+
+				case EConst(CIdent(s)):
+					var replace = switch(currentRole)	{
+						case None: s;
+						case Some(r): (s == "self") ? r.name : s;
+					}
+					fields.unshift(replace);
+					return fields;
+
+				case _:	
+					return null;
+			}
 		}
 	}
-
+	
 	/**
 	 * Given that console is a Role, rewriting 
 	 * [console, cursor, pos] to [console__cursor, pos]
 	 */
 	function replaceIdentifiers(e : Expr, currentRoleOption : Option<DciRole>) : Bool {
 		var fieldArray = extractIdentifier(e, currentRoleOption);
+		if (fieldArray == null) return false;
+		
 		var currentRole : DciRole = switch currentRoleOption { 
 			case Option.None: null;
 			case Option.Some(role): role;
@@ -141,10 +182,12 @@ class RoleMethodReplacer
 					fieldArray.shift(); // Remove "this", if 1 or 0 length then there's no need to rename.
 					if (fieldArray.length <= 1) return false;
 				}
-				
+
+			/*
 			case "self" if (currentRole != null):
 				// Rename self to the actual role name
 				fieldArray[0] = currentRole.name;
+			*/
 				
 			case _:
 		}
