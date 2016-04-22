@@ -17,21 +17,6 @@ using haxe.macro.MacroStringTools;
 
 class DciContextBuilder
 {
-	// Debugging autocompletion is very tedious, so here's a helper method.
-	public static function fileTrace(o : Dynamic, ?file : String)
-	{
-		file = Context.definedValue("filetrace");
-		if (file == null) file = "e:\\temp\\filetrace.txt";
-		
-		var f : sys.io.FileOutput;
-		try f = sys.io.File.append(file, false)
-		catch (e : Dynamic) f = sys.io.File.write(file, false);
-		f.writeString(Std.string(o) + "\n");
-		f.close();
-	}
-
-	//////////////////////////////////////////////////
-	
 	public static function build() : Array<Field> {
 		var contextFields = Context.getBuildFields();
 
@@ -41,32 +26,13 @@ class DciContextBuilder
 			contextFields.filter(isRoleField).map(fieldToRole)
 		);
 
-		function showMethodsFor(e : Expr, roleName : String) {
-			var role = context.roles.find(function(r) return r.name == roleName);
-			if (role != null) fileTrace(role.name);
+		// Autocompletion?
+		if (Context.defined("display")) {
+			var autocompleteField = new Autocompletion(context).autocomplete();
+			if (autocompleteField != null) contextFields.push(autocompleteField);
+			return contextFields;
 		}
 		
-		function displayCorrectMethods(e : Expr) {
-			switch e.expr {
-				case EDisplay(e2, isCall): 
-					switch e2.expr {
-						case EConst(CIdent(s)) | EField({expr: EConst(CIdent("this")), pos: _}, s):
-							showMethodsFor(e2, s);
-						case _:
-					}					
-				case _:
-			}
-			
-			e.iter(displayCorrectMethods);
-		}
-
-		if (Context.defined("display")) {
-			for (f in context.fields) switch f.kind {
-				case FFun(f): displayCorrectMethods(f.expr);
-				case _:
-			}
-		}
-
 		// Rewrite RoleMethod calls (destination.deposit -> destination__desposit)
 		new RoleMethodReplacer(context).replaceAll();
 		
@@ -83,7 +49,7 @@ class DciContextBuilder
 				access: [APrivate]
 			});
 		}
-		
+
 		// After all replacement is done, test if all roles are bound.
 		for (r in context.roles) if(r.bound == null) {
 			Context.warning("Role " + r.name + " isn't bound in this Context.", r.field.pos);
@@ -163,6 +129,21 @@ class DciContextBuilder
 			case _: 
 				Context.error("Only var fields can be a Role.", field.pos);
 		}
+	}
+	
+	////////////////////////////////////////////////////////////////////////////////////
+	
+	// Debugging autocompletion is very tedious, so here's a helper method.
+	public static function fileTrace(o : Dynamic, ?file : String)
+	{
+		file = Context.definedValue("filetrace");
+		if (file == null) file = "e:\\temp\\filetrace.txt";
+		
+		var f : sys.io.FileOutput;
+		try f = sys.io.File.append(file, false)
+		catch (e : Dynamic) f = sys.io.File.write(file, false);
+		f.writeString(Std.string(o) + "\n");
+		f.close();
 	}
 }
 #end
