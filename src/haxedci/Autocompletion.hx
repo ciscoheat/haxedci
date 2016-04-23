@@ -43,25 +43,7 @@ class Autocompletion
 		if (currentRole == currentDisplayRole())
 			fields = fields.concat(currentRole.contract);
 			
-		return FVar(defineRoleMethodType(currentRole, fields));
-	}
-	
-	// Define a type for the role, so it can be easily found when autocompleting.
-	function defineRoleMethodType(role : DciRole, fields : Array<Field>) : ComplexType {
-		var pack = ['dci'].concat(context.cls.pack).concat([context.name.toLowerCase()]);
-		
-		Context.defineType({
-			pos: role.field.pos,
-			params: null,
-			pack: pack,
-			name: role.name,
-			meta: null,
-			kind: TDStructure,
-			isExtern: false,
-			fields: fields
-		});
-		
-		return TPath({ sub: null, params: null, pack: pack, name: role.name });
+		return FVar(TAnonymous(fields));
 	}
 	
 	// Return the function type or Dynamic as default. This makes autocompletion work

@@ -1,25 +1,20 @@
 package haxedci;
-import haxe.io.Path;
-import sys.FileSystem;
-import sys.io.File;
 
 #if macro
-import haxe.ds.Option;
-import haxe.macro.Compiler;
 import haxe.macro.Expr;
 import haxe.macro.Context;
-import haxe.Serializer;
-import haxe.Unserializer;
 import haxedci.DciContext.DciRole;
 import haxedci.DciContext.DciRoleMethod;
 
 using Lambda;
 using StringTools;
 using haxe.macro.ExprTools;
-using haxe.macro.MacroStringTools;
 
 class DciContextBuilder
 {
+	public static var allowThisInRoleMethods = false;
+	public static var allowExernalRoleContractAccess = false;
+	
 	public static function build() : Array<Field> {
 		var contextFields = Context.getBuildFields();
 

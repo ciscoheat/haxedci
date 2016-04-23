@@ -170,7 +170,7 @@ class RoleMethodReplacer
 		
 		switch fieldArray[0] {
 			case "this":
-				if (currentRole != null)
+				if (currentRole != null && !DciContextBuilder.allowThisInRoleMethods)
 					Context.error('"this" keyword is not allowed in RoleMethods, use "self" or reference the Role directly instead.', e.pos);
 				else {
 					// Remove "this", then if 1 or 0 length then there's no need to rename.
@@ -194,18 +194,22 @@ class RoleMethodReplacer
 
 		var potentialRoleMethod = fieldArray[1];
 		
-		// Test if a Role-object-contract method is accessed outside its Role
-		if (roles.exists(potentialRole) && (currentRole == null || currentRole.name != potentialRole)) {
-			if (roles.get(potentialRole).contract.find(function(f) return f.name == potentialRoleMethod) != null) {
-				Context.error('Cannot access field $potentialRoleMethod outside its Role', e.pos);
+		if(roles.exists(potentialRole)) {		
+			// Test if a Role-object-contract method is accessed outside its Role
+			if (!DciContextBuilder.allowExernalRoleContractAccess && 
+				(currentRole == null || currentRole.name != potentialRole)) 
+			{
+				if (roles.get(potentialRole).contract.find(function(f) return f.name == potentialRoleMethod) != null) {
+					Context.error('Cannot access field $potentialRoleMethod outside its Role', e.pos);
+				}
 			}
-		}
 
-		// Rewrite only if a RoleMethod is referred to
-		if (roles.exists(potentialRole) && roleMethodNames.get(potentialRole).has(potentialRoleMethod)) {
-			// Concatename the first and second fields.
-			fieldArray[1] = potentialRole + "__" + potentialRoleMethod;
-			fieldArray.shift();
+			// Rewrite only if a RoleMethod is referred to
+			if (roleMethodNames.get(potentialRole).has(potentialRoleMethod)) {
+				// Concatename the first and second fields.
+				fieldArray[1] = potentialRole + "__" + potentialRoleMethod;
+				fieldArray.shift();
+			}
 		}
 
 		//trace(fieldArray);
