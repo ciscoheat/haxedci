@@ -1,4 +1,7 @@
 package haxedci;
+import haxe.io.Path;
+import sys.FileSystem;
+import sys.io.File;
 
 #if macro
 import haxe.ds.Option;
@@ -36,7 +39,7 @@ class DciContextBuilder
 			pos: role.field.pos,
 			name: role.field.name,
 			meta: role.field.meta,
-			kind: role.field.kind,
+			kind: displayMode ? new Autocompletion(context).fieldKindForRole(role) : role.field.kind,
 			doc: role.field.doc,
 			access: role.field.access
 		}));
@@ -52,10 +55,12 @@ class DciContextBuilder
 				access: [APrivate]
 			});
 		}
-
-		// After all replacement is done, test if all roles are bound.
-		for (r in context.roles) if(r.bound == null) {
-			Context.warning("Role " + r.name + " isn't bound in this Context.", r.field.pos);
+		
+		if (!displayMode) {	
+			// After all replacement is done, test if all roles are bound.
+			for (r in context.roles) if(r.bound == null) {
+				Context.warning("Role " + r.name + " isn't bound in this Context.", r.field.pos);
+			}
 		}
 				
 		return outputFields;

@@ -45,7 +45,7 @@ class MoneyTransfer implements dci.Context {
     }
 
     public function transfer() {
-        this.source.withdraw();
+        this.source.withdraw();	
     }
 
     @role var source : {
@@ -65,6 +65,10 @@ class MoneyTransfer implements dci.Context {
         function deposit() {
             self.increaseBalance(amount);
 			return true;
+        }
+
+        function test() {
+            return "test";
         }
     }
 
