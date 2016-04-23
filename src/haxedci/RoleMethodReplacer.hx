@@ -72,13 +72,11 @@ class RoleMethodReplacer
 		switch(e.expr) {
 			case EFunction(_, f) if (f.expr != null): 
 				// Change function, to check for role bindings is same function
-				replaceInExpr(f.expr, currentRole, Some(f)); return;
-			case EField(_, _): 
+				replaceInExpr(f.expr, currentRole, Some(f)); 
+				return;
+			case EField(_, _) | EConst(CIdent(_)):
 				// Fields could be changed to role__method
-				if (replaceIdentifiers(e, currentRole)) return;
-			case EConst(CIdent(s)) if (s == "self" && role != null):				
-				// self is special, should be changed to current role.
-				e.expr = EConst(CIdent(role.name));
+				replaceIdentifiers(e, currentRole);
 			case EConst(CString(s)) if (role != null && e.toString().charAt(0) == "'"):
 				// Interpolation strings must be expanded and iterated, in case "self" is hidden there.
 				e.expr = Format.format(e).expr;
@@ -168,14 +166,16 @@ class RoleMethodReplacer
 			case Option.Some(role): role;
 		}
 		
+		var hasThis = false;
+		
 		switch fieldArray[0] {
 			case "this":
 				if (currentRole != null && !DciContextBuilder.allowThisInRoleMethods)
 					Context.error('"this" keyword is not allowed in RoleMethods, use "self" or reference the Role directly instead.', e.pos);
 				else {
-					// Remove "this", then if 1 or 0 length then there's no need to rename.
-					fieldArray.shift(); 
-					if (fieldArray.length <= 1) return false;
+					// Remove "this" for easier array calculations.
+					hasThis = true;
+					fieldArray.shift();
 				}
 
 			case _:
@@ -185,32 +185,38 @@ class RoleMethodReplacer
 		
 		// Test if the field refers to a RoleMethod in the current Role, then prepend the current role.
 		if (fieldArray.length == 1) {
-			if (roleMethodNames.get(currentRole.name).has(potentialRole) ||
-				currentRole.contract.find(function(f) return f.name == potentialRole) != null) 
-			{					
-				fieldArray.unshift(currentRole.name);
-			}
-		}
-
-		var potentialRoleMethod = fieldArray[1];
-		
-		if(roles.exists(potentialRole)) {		
-			// Test if a Role-object-contract method is accessed outside its Role
-			if (!DciContextBuilder.allowExernalRoleContractAccess && 
-				(currentRole == null || currentRole.name != potentialRole)) 
+			if (currentRole != null && (roleMethodNames.get(currentRole.name).has(potentialRole) ||
+				currentRole.contract.find(function(f) return f.name == potentialRole) != null))
 			{
-				if (roles.get(potentialRole).contract.find(function(f) return f.name == potentialRoleMethod) != null) {
-					Context.error('Cannot access field $potentialRoleMethod outside its Role', e.pos);
+				fieldArray.unshift(currentRole.name);
+				// Reset potentialRole since the array has changed
+				potentialRole = fieldArray[0];
+			}
+		} 
+		
+		if (fieldArray.length > 1) {
+			var potentialRoleMethod = fieldArray[1];
+			
+			if(roles.exists(potentialRole)) {		
+				// Test if a Role-object-contract method is accessed outside its Role
+				if (!DciContextBuilder.allowExernalRoleContractAccess && 
+					(currentRole == null || currentRole.name != potentialRole)) 
+				{
+					if (roles.get(potentialRole).contract.find(function(f) return f.name == potentialRoleMethod) != null) {
+						Context.error('Cannot access field $potentialRoleMethod outside its Role', e.pos);
+					}
+				}
+
+				// Rewrite only if a RoleMethod is referred to
+				if (roleMethodNames.get(potentialRole).has(potentialRoleMethod)) {
+					// Concatename the first and second fields.
+					fieldArray[1] = potentialRole + "__" + potentialRoleMethod;
+					fieldArray.shift();
 				}
 			}
-
-			// Rewrite only if a RoleMethod is referred to
-			if (roleMethodNames.get(potentialRole).has(potentialRoleMethod)) {
-				// Concatename the first and second fields.
-				fieldArray[1] = potentialRole + "__" + potentialRoleMethod;
-				fieldArray.shift();
-			}
 		}
+		
+		if (hasThis) fieldArray.unshift("this");
 
 		//trace(fieldArray);
 		

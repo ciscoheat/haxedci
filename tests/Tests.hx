@@ -67,9 +67,7 @@ class MoneyTransfer implements dci.Context {
 			return true;
         }
 
-        function test() {
-            return "test";
-        }
+        function test2() return deposit();
     }
 
     var amount : Int;
