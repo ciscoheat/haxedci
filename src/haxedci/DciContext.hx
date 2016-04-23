@@ -47,7 +47,10 @@ class DciRole {
 
 		if (fieldType.getName() != "TAnonymous") throw "contract wasn't TAnonymous";
 		
-		this.contract = cast fieldType.getParameters()[0];
+		this.contract = switch fieldType {
+			case TAnonymous(fields): fields;
+			case _: null;
+		}
 
 		this.field = {
 			pos: field.pos,
