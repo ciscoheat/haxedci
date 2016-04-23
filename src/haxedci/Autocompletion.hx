@@ -20,6 +20,8 @@ using Lambda;
  */
 class Autocompletion
 {
+	public var displayExpr : Expr;
+	
 	var context : DciContext;
 
 	public function new(context : DciContext) {
@@ -27,62 +29,80 @@ class Autocompletion
 		this.context = context;
 	}
 
-	public function autocomplete() : Field {
-		var output : Field;
+	function displayRole() : DciRole {
+		function testEDisplay(e : Expr) : Bool {
+			var output = false;
+			function iterateForEDisplay(e : Expr) switch e.expr {
+				case EDisplay(e2, _): 
+					displayExpr = e2;
+					output = true;
+				case _:	e.iter(iterateForEDisplay);
+			}
+			iterateForEDisplay(e);
+			return output;
+		}	
 		
 		for (role in context.roles) for (rm in role.roleMethods) {
-			output = testEDisplay(rm.method.expr, role);
-			if (output != null) return output;
-		}
-		
-		for (f in context.fields) switch f.kind {
-			case FFun(f): 
-				output = testEDisplay(f.expr, null);
-				if (output != null) return output;
-			case _:
+			if (testEDisplay(rm.method.expr)) return role;
 		}
 		
 		return null;
 	}
-
-	function showMethodsFor(e : Expr, roleName : String) : Field {
-		var role = context.roles.find(function(r) return r.name == roleName);
-		if (role == null) return null;
-
-		e.expr = EConst(CIdent("__autocompletion"));
-		
-		return {
-			pos: e.pos,
-			name: "__autocompletion",
-			meta: null,
-			kind: role.field.kind,
-			doc: null,
-			access: [APrivate]
-		};
-	}
 	
-	function testEDisplay(e : Expr, currentRole : DciRole) : Field {
-		if (e == null) return null;
+	// Return the function type, try to type it if it doesn't exist, or return Void as default.
+	function functionType(func : Function) : ComplexType {
+		var void = TPath( { sub: null, params: null, pack: [], name: "Void" } );
 		
-		var output = null;
-		function displayCorrectMethods(e : Expr) {
-			switch e.expr {
-				case EDisplay(e2, isCall): 
-					switch e2.expr {
-						case EConst(CIdent(s)) | EField( { expr: EConst(CIdent("this")), pos: _ }, s):
-							if (s == "self") s = currentRole.name;
-							output = showMethodsFor(e2, s);
-						case _:
-					}					
-				case _:
-			}
-			
-			if (output != null) return;
-			e.iter(displayCorrectMethods);
+		return if (func.ret != null) {
+			func.ret;
+		} else if (func.expr == null) {
+			void;
+		} else try {
+			Context.toComplexType(Context.typeof(func.expr));
+		} catch (e : Dynamic) {
+			void;
 		}
+	}
+
+	public function fieldKindForRole(currentRole : DciRole) : FieldType {
+		var fields = [for (rm in currentRole.roleMethods) {
+			pos: rm.method.expr.pos,
+			name: rm.name,
+			meta: null,
+			kind: FFun({
+				ret: functionType(rm.method),
+				params: rm.method.params,
+				expr: null,
+				args: rm.method.args
+			}),
+			doc: null,
+			access: null
+		}];
 		
-		displayCorrectMethods(e);
-		return output;
-	}	
+		// If in the current role, merge the contract and rolemethods.
+		if (currentRole == displayRole()) fields = fields.concat(currentRole.contract);
+		
+		var newType = defineRoleMethodType(currentRole, fields);
+		if (displayExpr != null) displayExpr.expr = ECheckType(macro null, newType);
+		
+		return FVar(newType);
+	}
+
+	function defineRoleMethodType(role : DciRole, fields : Array<Field>) : ComplexType {
+		var pack = ['dci'].concat(context.cls.pack).concat([context.name.toLowerCase()]);
+		
+		Context.defineType({
+			pos: role.field.pos,
+			params: null,
+			pack: pack,
+			name: role.name,
+			meta: null,
+			kind: TDStructure,
+			isExtern: false,
+			fields: fields
+		});
+		
+		return TPath({ sub: null, params: null, pack: pack, name: role.name });
+	}
 }
 #end

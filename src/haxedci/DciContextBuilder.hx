@@ -22,21 +22,24 @@ class DciContextBuilder
 
 		// Create the Context
 		var context = new DciContext(
+			Context.getLocalClass().get(),
 			contextFields.filter(function(f) return !isRoleField(f)),
 			contextFields.filter(isRoleField).map(fieldToRole)
 		);
-
-		// Autocompletion?
-		if (Context.defined("display")) {
-			var autocompleteField = new Autocompletion(context).autocomplete();
-			if (autocompleteField != null) contextFields.push(autocompleteField);
-			return contextFields;
-		}
 		
+		var displayMode = Context.defined("display");
+
 		// Rewrite RoleMethod calls (destination.deposit -> destination__desposit)
 		new RoleMethodReplacer(context).replaceAll();
 		
-		var outputFields = context.fields.concat(context.roles.map(function(role) return role.field));
+		var outputFields = context.fields.concat(context.roles.map(function(role) return {
+			pos: role.field.pos,
+			name: role.field.name,
+			meta: role.field.meta,
+			kind: role.field.kind,
+			doc: role.field.doc,
+			access: role.field.access
+		}));
 		
 		// Create fields for the RoleMethods
 		for (role in context.roles) for (roleMethod in role.roleMethods) {
@@ -72,21 +75,6 @@ class DciContextBuilder
 		}
 	}
 
-	// Return the function type, try to type it if it doesn't exist, or return Void as default.
-	static function functionType(func : Function) : ComplexType {
-		var void = TPath( { sub: null, params: null, pack: [], name: "Void" } );
-		
-		return if (func.ret != null) {
-			func.ret;
-		} else if (func.expr == null) {
-			void;
-		} else try {
-			Context.toComplexType(Context.typeof(func.expr));
-		} catch (e : Dynamic) {
-			void;
-		}
-	}
-	
 	static function fieldToRole(field : Field) : DciRole {
 		function incorrectTypeError() {
 			Context.error("A Role must have an anonymous structure as its contract. " +

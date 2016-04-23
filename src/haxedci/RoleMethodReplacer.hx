@@ -194,6 +194,13 @@ class RoleMethodReplacer
 
 		var potentialRoleMethod = fieldArray[1];
 		
+		// Test if a Role-object-contract method is accessed outside its Role
+		if (roles.exists(potentialRole) && (currentRole == null || currentRole.name != potentialRole)) {
+			if (roles.get(potentialRole).contract.find(function(f) return f.name == potentialRoleMethod) != null) {
+				Context.error('Cannot access field $potentialRoleMethod outside its Role', e.pos);
+			}
+		}
+
 		// Rewrite only if a RoleMethod is referred to
 		if (roles.exists(potentialRole) && roleMethodNames.get(potentialRole).has(potentialRoleMethod)) {
 			// Concatename the first and second fields.
