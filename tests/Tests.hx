@@ -16,7 +16,6 @@ class Tests extends BuddySuite implements Buddy<[Tests]> {
 			});
 
            it("should return properly using the 'dci.Self' type", {
-				pending();
 				var savings = new AccountSelf("Savings", 1000);
 				var home = new AccountSelf("Home", 0);
 
@@ -128,13 +127,13 @@ class MoneyTransferSelf implements dci.Context {
     } =
     {
         function withdraw() {
-            self.decreaseBalance(amount);
+            self.decreaseBalance(Std.int(amount/2)).decreaseBalance(Std.int(amount/2));
             destination.deposit();
         }
     }
 
     @role var destination : {
-        function increaseBalance(a : Int) : Dynamic;
+        function increaseBalance(a : Int) : dci.Self;
 		var name(default, null) : String;
     } =
     {

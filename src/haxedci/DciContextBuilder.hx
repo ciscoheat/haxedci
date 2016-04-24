@@ -1,6 +1,7 @@
 package haxedci;
 
 #if macro
+import haxe.macro.Type.ClassType;
 import haxe.macro.Expr;
 import haxe.macro.Context;
 import haxedci.DciContext.DciRole;
@@ -17,12 +18,15 @@ class DciContextBuilder
 	
 	public static function build() : Array<Field> {
 		var contextFields = Context.getBuildFields();
+		
+		var cls = Context.getLocalClass().get();		
+		if (cls == null) throw "Context.getLocalClass() was null";
 
 		// Create the Context
 		var context = new DciContext(
-			Context.getLocalClass().get(),
+			cls,
 			contextFields.filter(function(f) return !isRoleField(f)),
-			contextFields.filter(isRoleField).map(fieldToRole)
+			contextFields.filter(isRoleField).map(fieldToRole.bind(cls))
 		);
 		
 		var displayMode = Context.defined("display");
@@ -75,7 +79,7 @@ class DciContextBuilder
 		}
 	}
 
-	static function fieldToRole(field : Field) : DciRole {
+	static function fieldToRole(cls : ClassType, field : Field) : DciRole {
 		function incorrectTypeError() {
 			Context.error("A Role must have an anonymous structure as its contract. " +
 				"See http://haxe.org/manual/types-anonymous-structure.html for syntax.", field.pos);
@@ -112,7 +116,7 @@ class DciContextBuilder
 						Context.error("A Role can only be assigned a block of RoleMethods.", e.pos);
 				}
 				
-				new DciRole(field, roleMethods);
+				new DciRole(cls.pack, cls.name, field, roleMethods);
 				
 			case _: 
 				Context.error("Only var fields can be a Role.", field.pos);

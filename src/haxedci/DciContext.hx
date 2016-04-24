@@ -33,9 +33,12 @@ class DciRole {
 	
 	function get_name() return field.name;
 
-	public function new(field : Field, roleMethods : Iterable<DciRoleMethod>) {
+	var selfType : ComplexType;
+	
+	public function new(pack : Array<String>, className : String, field : Field, roleMethods : Iterable<DciRoleMethod>) {
+		if (pack == null) throw "pack was null";
+		if (className == null) throw "className was null";
 		if (field == null) throw "field was null";
-		if (field.kind.getName() != "FVar") throw "field wasn't a var";
 		if (roleMethods == null) throw "roleMethods was null";
 		for (r in roleMethods) if (r == null) throw "a roleMethod was null.";
 
@@ -45,13 +48,56 @@ class DciRole {
 			case _: null;
 		}
 
-		if (fieldType.getName() != "TAnonymous") throw "contract wasn't TAnonymous";
+		if (fieldType == null || fieldType.getName() != "TAnonymous") throw "contract wasn't TAnonymous";
 		
 		this.contract = switch fieldType {
 			case TAnonymous(fields): fields;
 			case _: null;
 		}
-
+		
+		function testSelfReference(type : Null<ComplexType>) : ComplexType {
+			return if (type == null) null
+			else switch type {
+				case TPath({sub: _, params: _, pack: ["dci"], name: "Self"}) | TPath({sub: _, params: _, pack: [], name: "Self"}):
+					if (selfType == null) {
+						var classPackage = className.charAt(0).toLowerCase() + className.substr(1);
+						var pack = ['dci'].concat(pack).concat([classPackage]);
+						var name = field.name;
+						
+						// Define a custom type, to avoid circular referencing of TAnonymous
+						haxe.macro.Context.defineType({
+							pos: field.pos,
+							params: null,
+							pack: pack,
+							name: name,
+							meta: null,
+							kind: TDStructure,
+							isExtern: false,
+							fields: this.contract
+						});
+						
+						selfType = TPath( { sub: null, params: null, pack: pack, name: name } );
+					}
+					selfType;
+				case _:
+					type;
+			}
+		}
+		
+		// Test if a field references Self, then change that type to the fieldType
+		for (field in this.contract) {
+			field.kind = switch field.kind {
+				case FVar(type, e): 
+					FVar(testSelfReference(type));
+				case FFun(f):
+					for (arg in f.args) arg.type = testSelfReference(arg.type);
+					f.ret = testSelfReference(f.ret);
+					FFun(f);
+				case FProp(get, set, t, e):
+					FProp(get, set, testSelfReference(t), e);
+			}
+		}
+		
 		this.field = {
 			pos: field.pos,
 			name: field.name,
