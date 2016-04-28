@@ -3,6 +3,8 @@ package haxedci;
 import haxe.macro.Expr;
 import haxe.macro.Type;
 
+using Lambda;
+
 class DciContext {
 	public var name(get, never) : String;
 	public var cls(default, null) : ClassType;
@@ -57,6 +59,15 @@ class DciRole {
 			case _: contract;
 		}
 		
+		// Test for RoleMethod/contract name collisions
+		for (r in roleMethods) {
+			var contract = this.contract.find(function(c) return c.name == r.name);
+			if (contract != null) {
+				haxe.macro.Context.warning("RoleMethod/contract name collision for field " + r.name, r.method.expr.pos);
+				haxe.macro.Context.error("RoleMethod/contract name collision for field " + r.name, contract.pos);
+			}
+		}
+		
 		function testSelfReference(type : Null<ComplexType>) : ComplexType {
 			return if (type == null) null
 			else switch type {
@@ -98,6 +109,10 @@ class DciRole {
 				case FProp(get, set, t, e):
 					FProp(get, set, testSelfReference(t), e);
 			}
+		}
+		for (roleMethod in roleMethods) {
+			roleMethod.method.ret = testSelfReference(roleMethod.method.ret);
+			for (arg in roleMethod.method.args) arg.type = testSelfReference(arg.type);
 		}
 		
 		this.field = {

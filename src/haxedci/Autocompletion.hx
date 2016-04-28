@@ -36,12 +36,16 @@ class Autocompletion
 				args: rm.method.args
 			}),
 			doc: null,
-			access: null
+			access: rm.isPublic ? [APublic] : [APrivate]
 		}];
 
 		// If we're inside the role that's autocompleted, add its contract fields to output.
 		if (currentRole == currentDisplayRole())
 			fields = fields.concat(currentRole.contract);
+		else
+			fields = fields.filter(function(f) return f.access != null && f.access.has(APublic)).concat(
+				currentRole.contract.filter(function(f) return f.access != null && f.access.has(APublic)
+			));
 			
 		return FVar(TAnonymous(fields));
 	}

@@ -26,7 +26,7 @@ class Tests extends BuddySuite implements Buddy<[Tests]> {
 				home.balance.should.be(500);
 
 				transfer.testDestination.should.be("HomeHomePublicHomePrivate");
-				transfer.testSource.should.be("HomePublicHomePublic");
+				transfer.testSource.should.be("HomePublic");
 			});			
 		});
     }
@@ -60,11 +60,11 @@ class MoneyTransfer implements dci.Context {
     }
 
     public function transfer() {
-        this.source.withdraw();	
+        this.source.withdraw();
     }
 
     @role var source : {
-        function decreaseBalance(a : Int) : Void;
+		function decreaseBalance(a : Int) : Void;
     } =
     {
         function withdraw() {
@@ -132,17 +132,18 @@ class MoneyTransferSelf implements dci.Context {
 
     @role var source : {
         function decreaseBalance(a : Int) : Self;
-		
-		public function withdraw() {
-            self.decreaseBalance(Std.int(amount / 2)).decreaseBalance(Std.int(amount / 2));
-			// Testing RoleMethod access inside own role
-			addSource(); self.addSource();
-            destination.deposit();
-		}
-		
-		function addSource() {
+
+		function addSource(a : Self) : Self {
 			testSource += destination.namePublic;
+			return a;
 		}
+	} = {
+		function withdraw() {
+            self.decreaseBalance(Std.int(amount / 2));
+			// Testing RoleMethod access inside own role
+			self.addSource(self).decreaseBalance(Std.int(amount / 2));
+            destination.deposit();
+		}		
 	};
 
     @role var destination : {

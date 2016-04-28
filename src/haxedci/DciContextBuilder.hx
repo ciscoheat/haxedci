@@ -115,14 +115,14 @@ class DciContextBuilder
 					case _: incorrectTypeError();
 				}
 				
-				// Test the function expr (old syntax)
+				// Test the function expr for RoleMethods
 				if(e != null) switch e.expr {
 					case EBlock(exprs): 
 						exprs.map(function(e) return switch e.expr {
 							case EFunction(name, func):
 								if (name == null) Context.error("A RoleMethod must have a name.", e.pos);
 								
-								// All RoleMethods in the expr will be public (backward compatibility)
+								// All RoleMethods in the expr will be public
 								if (func.expr != null) roleMethods.push(new DciRoleMethod(name, func, true));
 								else Context.error("A RoleMethod must have a function body.", e.pos);
 							case _:
