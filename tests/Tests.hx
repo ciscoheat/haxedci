@@ -26,7 +26,7 @@ class Tests extends BuddySuite implements Buddy<[Tests]> {
 				home.balance.should.be(500);
 
 				transfer.testDestination.should.be("HomeHomePublicHomePrivate");
-				transfer.testSource.should.be("HomePublic");
+				transfer.testSource.should.be("HomePublicHomePublic");
 			});			
 		});
     }
@@ -135,8 +135,13 @@ class MoneyTransferSelf implements dci.Context {
 		
 		public function withdraw() {
             self.decreaseBalance(Std.int(amount / 2)).decreaseBalance(Std.int(amount / 2));
-			testSource = destination.namePublic;
+			// Testing RoleMethod access inside own role
+			addSource(); self.addSource();
             destination.deposit();
+		}
+		
+		function addSource() {
+			testSource += destination.namePublic;
 		}
 	};
 
