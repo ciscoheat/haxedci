@@ -14,7 +14,7 @@ using haxe.macro.ExprTools;
 class DciContextBuilder
 {
 	public static var allowThisInRoleMethods = false;
-	public static var allowExernalRoleContractAccess = false;
+	public static var publicRoleAccess = false;
 	
 	public static function build() : Array<Field> {
 		var contextFields = Context.getBuildFields();
@@ -93,8 +93,20 @@ class DciContextBuilder
 			case FVar(t, e):
 				if (t == null) incorrectTypeError();
 
+				var roleMethods : Array<DciRoleMethod> = [];
+				var contract : Array<Field> = [];
+
 				switch(t) {
-					case TAnonymous(fields): // The only correct option
+					case TAnonymous(fields): 
+						var keep = [];
+						for (f in fields) switch f.kind {
+							case FFun(fun) if (fun.expr != null):
+								roleMethods.push(new DciRoleMethod(f.name, fun, f.access.has(APublic)));
+							case _:
+								keep.push(f);
+						}
+						// Remove roleMethods (functions with body)
+						field.kind = FVar(TAnonymous(keep), e);
 
 					case TPath( { name: "Int", pack: [], params: [] } ): basicTypeError("Int");
 					case TPath( { name: "Bool", pack: [], params: [] } ): basicTypeError("Bool");
@@ -103,12 +115,16 @@ class DciContextBuilder
 					case _: incorrectTypeError();
 				}
 				
-				var roleMethods = if(e == null) [] else switch e.expr {
+				// Test the function expr (old syntax)
+				if(e != null) switch e.expr {
 					case EBlock(exprs): 
 						exprs.map(function(e) return switch e.expr {
 							case EFunction(name, func):
 								if (name == null) Context.error("A RoleMethod must have a name.", e.pos);
-								new DciRoleMethod(name, func);
+								
+								// All RoleMethods in the expr will be public (backward compatibility)
+								if (func.expr != null) roleMethods.push(new DciRoleMethod(name, func, true));
+								else Context.error("A RoleMethod must have a function body.", e.pos);
 							case _:
 								Context.error("A Role can only contain functions as RoleMethods.", e.pos);
 						});
@@ -116,7 +132,7 @@ class DciContextBuilder
 						Context.error("A Role can only be assigned a block of RoleMethods.", e.pos);
 				}
 				
-				new DciRole(cls.pack, cls.name, field, roleMethods);
+				new DciRole(cls.pack, cls.name, field, roleMethods, contract);
 				
 			case _: 
 				Context.error("Only var fields can be a Role.", field.pos);

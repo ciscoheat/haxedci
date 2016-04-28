@@ -35,12 +35,14 @@ class DciRole {
 
 	var selfType : ComplexType;
 	
-	public function new(pack : Array<String>, className : String, field : Field, roleMethods : Iterable<DciRoleMethod>) {
+	public function new(pack : Array<String>, className : String, field : Field, roleMethods : Iterable<DciRoleMethod>, contract : Array<Field>) {
 		if (pack == null) throw "pack was null";
 		if (className == null) throw "className was null";
 		if (field == null) throw "field was null";
 		if (roleMethods == null) throw "roleMethods was null";
 		for (r in roleMethods) if (r == null) throw "a roleMethod was null.";
+		if (contract == null) throw "contract was null";
+		for (c in contract) if (c == null) throw "a contract field was null.";
 
 		// FVar(ComplexType(Array<Field>))
 		var fieldType : ComplexType = switch field.kind {
@@ -51,8 +53,8 @@ class DciRole {
 		if (fieldType == null || fieldType.getName() != "TAnonymous") throw "contract wasn't TAnonymous";
 		
 		this.contract = switch fieldType {
-			case TAnonymous(fields): fields;
-			case _: null;
+			case TAnonymous(fields): contract.concat(fields);
+			case _: contract;
 		}
 		
 		function testSelfReference(type : Null<ComplexType>) : ComplexType {
@@ -114,12 +116,14 @@ class DciRole {
 class DciRoleMethod {
 	public var name(default, null) : String;
 	public var method(default, null) : Function;
+	public var isPublic(default, null) : Bool;
 	
-	public function new(name : String, method : Function) {
+	public function new(name : String, method : Function, isPublic : Bool) {
 		if (name == null) throw "name was null";
 		if (method == null) throw "method was null";
 		
 		this.name = name;
 		this.method = method;
+		this.isPublic = isPublic;
 	}	
 }

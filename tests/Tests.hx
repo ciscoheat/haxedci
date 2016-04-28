@@ -25,7 +25,8 @@ class Tests extends BuddySuite implements Buddy<[Tests]> {
 				savings.balance.should.be(500);
 				home.balance.should.be(500);
 
-				transfer.test.should.be("Home");
+				transfer.testDestination.should.be("HomeHomePublicHomePrivate");
+				transfer.testSource.should.be("HomePublic");
 			});			
 		});
     }
@@ -91,13 +92,19 @@ class MoneyTransfer implements dci.Context {
 
 class AccountSelf {
     public var name(default, null) : String;
+	public var namePublic(default, null) : String;
+	public var namePrivate(default, null) : String;
+	
     public var balance(default, null) : Int;
 
     public function new(name, balance) {
         this.name = name;
+		this.namePrivate = name + "Private";
+		this.namePublic = name + "Public";
+		
         this.balance = balance;
-    }
-
+    }	
+	
     public function increaseBalance(amount: Int) : AccountSelf {
         balance += amount;
 		return this;
@@ -110,7 +117,8 @@ class AccountSelf {
 }
 
 class MoneyTransferSelf implements dci.Context {
-	public var test : String = "";
+	public var testDestination : String = "";
+	public var testSource : String = "";
 	
     public function new(source, destination, amount) {
         this.source = source;
@@ -124,23 +132,25 @@ class MoneyTransferSelf implements dci.Context {
 
     @role var source : {
         function decreaseBalance(a : Int) : Self;
-    } =
-    {
-        function withdraw() {
-            self.decreaseBalance(Std.int(amount/2)).decreaseBalance(Std.int(amount/2));
+		
+		public function withdraw() {
+            self.decreaseBalance(Std.int(amount / 2)).decreaseBalance(Std.int(amount / 2));
+			testSource = destination.namePublic;
             destination.deposit();
-        }
-    }
+		}
+	};
 
     @role var destination : {
         function increaseBalance(a : Int) : dci.Self;
+		
 		var name(default, null) : String;
-    } =
-    {
-        function deposit() {
-            test = self.increaseBalance(amount).name;
+		private var namePrivate(default, null) : String;
+		public var namePublic(default, null) : String;
+		
+        public function deposit() {
+            testDestination = self.increaseBalance(amount).name + namePublic + namePrivate;
         }
-    }
+    };
 
     var amount : Int;
 }

@@ -198,12 +198,21 @@ class RoleMethodReplacer
 			var potentialRoleMethod = fieldArray[1];
 			
 			if(roles.exists(potentialRole)) {		
-				// Test if a Role-object-contract method is accessed outside its Role
-				if (!DciContextBuilder.allowExernalRoleContractAccess && 
+				// Test if a Role-object-contract or RoleMethod is accessed outside its Role
+				if (!DciContextBuilder.publicRoleAccess && 
 					(currentRole == null || currentRole.name != potentialRole)) 
 				{
-					if (roles.get(potentialRole).contract.find(function(f) return f.name == potentialRoleMethod) != null) {
-						Context.error('Cannot access field $potentialRoleMethod outside its Role', e.pos);
+					var role = roles.get(potentialRole);
+					var contractMethod = role.contract.find(function(f) return f.name == potentialRoleMethod);
+					if (contractMethod != null && !contractMethod.access.has(APublic)) {
+						Context.error('Cannot access contract field ${role.name}.$potentialRoleMethod outside its Role. ' + 
+							'You can make it public if needed.', e.pos);
+					}
+					
+					var roleMethod = role.roleMethods.find(function(f) return f.name == potentialRoleMethod);
+					if (roleMethod != null && !roleMethod.isPublic) {
+						Context.error('Cannot access roleMethod ${role.name}.$potentialRoleMethod outside its Role. ' + 
+							'You can make it public if needed.', e.pos);
 					}
 				}
 

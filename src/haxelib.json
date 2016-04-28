@@ -4,7 +4,7 @@
   "license": "MIT",
   "tags": ["cross", "dci"],
   "description": "A DCI library with clean syntax and autocompletion.",
-  "version": "0.12.0",
-  "releasenote": "Rewritten, faster, cleaner and much more useful!",
+  "version": "0.13.0",
+  "releasenote": "Better syntax, that allows public/private RoleMethod and contract access.",
   "contributors": ["ciscoheat"]
 }
