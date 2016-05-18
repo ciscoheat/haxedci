@@ -205,13 +205,15 @@ class RoleMethodReplacer
 					var role = roles.get(potentialRole);
 					var contractMethod = role.contract.find(function(f) return f.name == potentialRoleMethod);
 					if (contractMethod != null) {
-						Context.warning('Contract field ${role.name}.$potentialRoleMethod accessed outside its Role.', e.pos);
+						if(!contractMethod.access.has(APrivate))
+							Context.warning('Contract field ${role.name}.$potentialRoleMethod accessed outside its Role.', e.pos);
+						else
+							Context.error('Cannot access private contract field ${role.name}.$potentialRoleMethod outside its Role.', e.pos);
 					}
 					
 					var roleMethod = role.roleMethods.find(function(f) return f.name == potentialRoleMethod);
 					if (roleMethod != null && !roleMethod.isPublic) {
-						Context.error('Cannot access RoleMethod ${role.name}.$potentialRoleMethod outside its Role. ' + 
-							'You can make it public if needed.', e.pos);
+						Context.error('Cannot access private RoleMethod ${role.name}.$potentialRoleMethod outside its Role.', e.pos);
 					}
 				}
 
