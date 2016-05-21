@@ -21,6 +21,9 @@ class DciContextBuilder
 		
 		var cls = Context.getLocalClass().get();		
 		if (cls == null) throw "Context.getLocalClass() was null";
+		
+		// A Context cannot be extended.
+		cls.meta.add(":final", [], cls.pos);
 
 		// Create the Context
 		var context = new DciContext(
