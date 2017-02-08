@@ -65,9 +65,8 @@ class MoneyTransfer implements dci.Context {
 
     @role var source : {
 		function decreaseBalance(a : Int) : Void;
-    } =
-    {
-        function withdraw() {
+
+        public function withdraw() {
             self.decreaseBalance(amount);
             destination.deposit();
         }
@@ -75,14 +74,14 @@ class MoneyTransfer implements dci.Context {
 
     @role var destination : {
         function increaseBalance(a : Int) : Void;
-    } =
-    {
-        function deposit() {
+
+        public function deposit() {
             self.increaseBalance(amount);
 			return true;
         }
 
-        function test2() return deposit();
+        function test2() return deposit();		
+		function now() return Date.now();
     }
 
     var amount : Int;
@@ -119,6 +118,8 @@ class AccountSelf {
 class MoneyTransferSelf implements dci.Context {
 	public var testDestination : String = "";
 	public var testSource : String = "";
+
+    var amount : Int;
 	
     public function new(source, destination, amount) {
         this.source = source;
@@ -137,14 +138,14 @@ class MoneyTransferSelf implements dci.Context {
 			testSource += destination.namePublic;
 			return a;
 		}
-	} = {
-		function withdraw() {
+
+		public function withdraw() {
             self.decreaseBalance(Std.int(amount / 2));
 			// Testing RoleMethod access inside own role
 			self.addSource(self).decreaseBalance(Std.int(amount / 2));
             destination.deposit();
 		}		
-	};
+	}
 
     @role var destination : {
         function increaseBalance(a : Int) : dci.Self;
@@ -156,7 +157,5 @@ class MoneyTransferSelf implements dci.Context {
         public function deposit() {
             testDestination = self.increaseBalance(amount).name + namePublic + namePrivate;
         }
-    };
-
-    var amount : Int;
+    }
 }

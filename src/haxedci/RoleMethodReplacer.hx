@@ -170,7 +170,7 @@ class RoleMethodReplacer
 		
 		switch fieldArray[0] {
 			case "this":
-				if (currentRole != null && !DciContextBuilder.allowThisInRoleMethods)
+				if (currentRole != null && !Context.defined("display") && !DciContextBuilder.allowThisInRoleMethods)
 					Context.error('"this" keyword is not allowed in RoleMethods, use "self" or reference the Role directly instead.', e.pos);
 				else {
 					// Remove "this" for easier array calculations.
@@ -199,13 +199,13 @@ class RoleMethodReplacer
 			
 			if(roles.exists(potentialRole)) {		
 				// Test if a Role-object-contract or RoleMethod is accessed outside its Role
-				if (!DciContextBuilder.publicRoleAccess && 
+				if (!Context.defined("display") && !DciContextBuilder.publicRoleAccess && 
 					(currentRole == null || currentRole.name != potentialRole)) 
 				{
 					var role = roles.get(potentialRole);
 					var contractMethod = role.contract.find(function(f) return f.name == potentialRoleMethod);
 					if (contractMethod != null) {
-						if(!contractMethod.access.has(APrivate))
+						if (!contractMethod.access.has(APrivate))
 							Context.warning('Contract field ${role.name}.$potentialRoleMethod accessed outside its Role.', e.pos);
 						else
 							Context.error('Cannot access private contract field ${role.name}.$potentialRoleMethod outside its Role.', e.pos);

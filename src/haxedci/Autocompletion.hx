@@ -17,10 +17,25 @@ using Lambda;
 class Autocompletion
 {
 	var context : DciContext;
+	var currentRole : DciRole;
 
-	public function new(context : DciContext) {
-		if (context == null) throw "context cannot be null.";		
+	public function new(context : DciContext, currentRole : DciRole) {
+		if (context == null) throw "context cannot be null.";
+		if (currentRole == null) throw "currentRole cannot be null.";
 		this.context = context;
+		this.currentRole = currentRole;
+	}
+	
+	public function searchForDisplay(roleMethod : DciRoleMethod) : Bool {
+		var e = findEDisplay(roleMethod.method.expr);
+		if (e != null) switch(e.expr) {
+			case EDisplay(e2, isCall):
+				e2.expr = EConst(CString("test"));
+				//fileTrace((isCall ? '[call] ' : '') + e2.toString());
+				//fileTrace(e2.expr);
+			case _:
+		}
+		return e != null;
 	}
 	
 	public function fieldKindForRole(currentRole : DciRole) : FieldType {
@@ -47,6 +62,8 @@ class Autocompletion
 				currentRole.contract.filter(function(f) return f.access != null && f.access.has(APublic)
 			));
 			
+		//DciContextBuilder.fileTrace(context.name + '.' + currentRole.name + ': ' + fields.map(function(f) return f.name));
+			
 		return FVar(TAnonymous(fields));
 	}
 	
@@ -60,20 +77,34 @@ class Autocompletion
 
 	function currentDisplayRole() : DciRole {
 		for (role in context.roles) for (rm in role.roleMethods) {
-			if (hasEDisplay(rm.method.expr)) return role;
+			if (findEDisplay(rm.method.expr) != null) return role;
 		}
 		
 		return null;
 	}
 
-	function hasEDisplay(e : Expr) : Bool {
-		var status = false;
+	function findEDisplay(e : Expr) : Expr {
+		var output : Expr = null;
 		function iterForEDisplay(e : Expr) switch e.expr {
-			case EDisplay(_, _): status = true;
+			case EDisplay(_, _): output = e;
 			case _: e.iter(iterForEDisplay);
 		}
 		iterForEDisplay(e);
-		return status;
+		return output;
 	}
+	
+	///////////////////////////////////////////////////////////////////////////
+	
+	// Debugging autocompletion is very tedious, so here's a helper method.
+	public static function fileTrace(o : Dynamic, ?file : String)
+	{
+		file = Context.definedValue("filetrace");
+		if (file == null) file = "e:\\temp\\filetrace.txt";
+		
+		var f = try sys.io.File.append(file, false)
+		catch (e : Dynamic) sys.io.File.write(file, false);
+		f.writeString(Std.string(o) + "\n");
+		f.close();
+	}	
 }
 #end
