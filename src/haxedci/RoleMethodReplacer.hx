@@ -83,6 +83,10 @@ class RoleMethodReplacer
 			case EBinop(OpAssign, e1, e2): 
 				// Potential role bindings, check if all are bound in same function
 				setRoleBindPos(e1, currentRole, currentFunction);
+			case EDisplay(e, isCall):
+				Autocompletion.fileTrace("---------------------");
+				Autocompletion.fileTrace(e);
+				Autocompletion.fileTrace(DciContextBuilder.contextData(context));
 			case _:
 		}
 

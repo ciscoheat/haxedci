@@ -68,29 +68,22 @@ class DciContextBuilder
 			outputFields.push({
 				pos: roleMethod.method.expr.pos,
 				name: role.name + '__' + roleMethod.name,
-				meta: [{ pos: roleMethod.method.expr.pos, params: [], name: ":noCompletion" }],
+				// TODO: Breaks autocompletion inside RoleMethods 
+				//meta: [{ pos: roleMethod.method.expr.pos, params: [], name: ":noCompletion" }],
+				meta: null,
 				kind: FFun(roleMethod.method),
 				doc: null,
 				access: [APrivate]
-			});
-			
-			/*
-			if (displayMode && !foundAutocompletion) {
-				foundAutocompletion = new Autocompletion(context, role).searchForDisplay(roleMethod);
-			}
-			*/
+			});			
 		}
 		
 		if (!displayMode) {	
 			// After all replacement is done, test if all roles are bound.
 			for (r in context.roles) if(r.bound == null) {
-				Context.warning("Role " + r.name + " isn't bound in this Context.", r.field.pos);
+				Context.warning("Role " + r.name + " isn't bound in its Context.", r.field.pos);
 			}
 		} else {
-			Autocompletion.fileTrace("===== " + context.name);
-			Autocompletion.fileTrace(context.roles.map(function(role) {
-				return role.name + " " + role.contract.map(function(c) return c.name) + role.roleMethods.map(function(rm) return rm.name);
-			}).join("\n"));
+			//Autocompletion.fileTrace(contextData(context));
 		}
 				
 		return outputFields;
@@ -142,6 +135,15 @@ class DciContextBuilder
 			case _: 
 				Context.error("Only var fields can be a Role.", field.pos);
 		}
+	}
+	
+	public static function contextData(context : DciContext) {
+		return "===== " + context.name + "\n" +
+		context.roles.map(function(role)
+			return role.name + " " + 
+			role.contract.map(function(c) return c.name) 
+			+ role.roleMethods.map(function(rm) return rm.name)
+		).join("\n");
 	}
 }
 #end
