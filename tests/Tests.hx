@@ -115,7 +115,7 @@ class AccountSelf {
     }
 }
 
-class MoneyTransferSelf implements dci.Context {
+@:keep class MoneyTransferSelf implements dci.Context {
 	public var testDestination : String = "";
 	public var testSource : String = "";
 
@@ -134,12 +134,13 @@ class MoneyTransferSelf implements dci.Context {
     @role var source : {
         function decreaseBalance(a : Int) : Self;
 
-		function addSource(a : Self) : Self {
+		function addSource(a : Self) : Self {			
 			testSource += destination.namePublic;
 			return a;
 		}
 
 		public function withdraw() {
+			
             self.decreaseBalance(Std.int(amount / 2));
 			// Testing RoleMethod access inside own role
 			self.addSource(self).decreaseBalance(Std.int(amount / 2));

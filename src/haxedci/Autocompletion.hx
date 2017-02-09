@@ -1,6 +1,5 @@
 package haxedci;
 
-#if macro
 import haxe.macro.Format;
 import haxedci.DciContext;
 import haxedci.DciContext.DciRole;
@@ -16,6 +15,7 @@ using Lambda;
 
 class Autocompletion
 {
+	#if macro
 	var context : DciContext;
 	var currentRole : DciRole;
 
@@ -92,6 +92,7 @@ class Autocompletion
 		iterForEDisplay(e);
 		return output;
 	}
+	#end
 	
 	///////////////////////////////////////////////////////////////////////////
 	
@@ -107,4 +108,3 @@ class Autocompletion
 		f.close();
 	}	
 }
-#end

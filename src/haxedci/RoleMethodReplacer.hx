@@ -5,6 +5,7 @@ import haxe.macro.Format;
 import haxedci.DciContext;
 import haxedci.DciContext.DciRole;
 import haxedci.DciContext.DciRoleMethod;
+import haxedci.Autocompletion.fileTrace;
 
 import haxe.ds.Option;
 import haxe.macro.Expr;
@@ -44,27 +45,29 @@ class RoleMethodReplacer
 	
 	public function replaceAll() {
 		for (role in roles) replaceRole(role);
-		for (field in context.fields) replaceField(field);
+		for (field in context.normalFields) {
+			replaceField(field);
+		}
 		
 		//trace("=== Fields rewritten for Context ==="); for (role in roles) for(rm in role.roleMethods) trace(rm.method.expr.toString());
 	}
 
 	function replaceRole(role : DciRole) {
 		for (roleMethod in role.roleMethods) {
-			replaceInExpr(roleMethod.method.expr, Option.Some(role), Option.Some(roleMethod.method));
+			replaceInExpr(roleMethod.method.expr, Option.Some(role), Option.Some(roleMethod), Option.Some(roleMethod.method));
 		}		
 	}
 
 	function replaceField(field : Field) {
 		switch(field.kind) {
-			case FVar(_, e): if(e != null) replaceInExpr(e, Option.None, Option.None);
-			case FFun(f): if(f.expr != null) replaceInExpr(f.expr, Option.None, Option.Some(f));
-			case FProp(_, _, _, e): if(e != null) replaceInExpr(e, Option.None, Option.None);
+			case FVar(_, e): if(e != null) replaceInExpr(e, Option.None, Option.None, Option.None);
+			case FFun(f): if(f.expr != null) replaceInExpr(f.expr, Option.None, Option.None, Option.Some(f));
+			case FProp(_, _, _, e): if(e != null) replaceInExpr(e, Option.None, Option.None, Option.None);
 		}
 	}
 
-	function replaceInExpr(e : Expr, currentRole : Option<DciRole>, currentFunction : Option<Function>) {
-		var role = switch currentRole {
+	function replaceInExpr(e : Expr, currentRole : Option<DciRole>, currentRoleMethod : Option<DciRoleMethod>, currentFunction : Option<Function>) {
+		var role : DciRole = switch currentRole {
 			case None: null;
 			case Some(role): role;
 		};
@@ -72,7 +75,7 @@ class RoleMethodReplacer
 		switch(e.expr) {
 			case EFunction(_, f) if (f.expr != null): 
 				// Change function, to check for role bindings is same function
-				replaceInExpr(f.expr, currentRole, Some(f)); 
+				replaceInExpr(f.expr, currentRole, currentRoleMethod, Some(f)); 
 				return;
 			case EField(_, _) | EConst(CIdent(_)):
 				// Fields could be changed to role__method
@@ -83,14 +86,29 @@ class RoleMethodReplacer
 			case EBinop(OpAssign, e1, e2): 
 				// Potential role bindings, check if all are bound in same function
 				setRoleBindPos(e1, currentRole, currentFunction);
-			case EDisplay(e, isCall):
-				Autocompletion.fileTrace("---------------------");
-				Autocompletion.fileTrace(e);
-				Autocompletion.fileTrace(DciContextBuilder.contextData(context));
+			case EDisplay(e, isCall): switch e.expr {
+				case EConst(CIdent(s)):
+					var displayRole = context.roles.find(function(role) return role.name == s);
+					if (displayRole != null) {
+						e.expr = ECheckType(macro null, TAnonymous(displayRole.publicApi()));
+					}
+					//fileTrace("---------------------");
+					//fileTrace(e);
+					switch currentRoleMethod {
+						case None:						
+						case Some(roleMethod): roleMethod.hasDisplay = true;
+					}
+					//fileTrace("---------------------");
+					//fileTrace(e);
+					//fileTrace(DciContextBuilder.contextData(context));
+					//fileTrace(role.roleMethods.map(function(f) return f.name));
+					//fileTrace(context.fields.map(function(f) return f.name));
+				case _:
+			}
 			case _:
 		}
 
-		e.iter(replaceInExpr.bind(_, currentRole, currentFunction));
+		e.iter(replaceInExpr.bind(_, currentRole, currentRoleMethod, currentFunction));
 	}
 
 	// Returns true if a Role was successfully bound in the Expr.
