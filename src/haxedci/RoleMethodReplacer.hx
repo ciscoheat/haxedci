@@ -28,19 +28,12 @@ class RoleMethodReplacer
 
 	var context : DciContext;
 	var roles = new Map<String, DciRole>();
-	var roleNames = ['self'];
-	var roleMethodNames = new Map<String, Array<String>>();
 
 	public function new(context : DciContext) {
-		if (context == null) throw "context cannot be null.";
-		
 		this.context = context;
 		
-		for (role in context.roles) {
-			roles.set(role.name, role);
-			roleNames.push(role.name);
-			roleMethodNames.set(role.name, [for (rm in role.roleMethods) rm.name]);
-		}
+		for (role in context.roles)
+			this.roles.set(role.name, role);
 	}
 	
 	public function replaceAll() {
@@ -49,45 +42,138 @@ class RoleMethodReplacer
 			replaceField(field);
 		}
 		
-		//trace("=== Fields rewritten for Context ==="); for (role in roles) for(rm in role.roleMethods) trace(rm.method.expr.toString());
+		// After all replacement is done, test if all roles are bound.
+		if (!Context.defined("display")) {
+			for (r in context.roles) if(r.bound == null) {
+				Context.warning("Role " + r.name + " isn't bound in its Context.", r.field.pos);
+			}
+		}
 	}
 
 	function replaceRole(role : DciRole) {
 		for (roleMethod in role.roleMethods) {
-			replaceInExpr(roleMethod.method.expr, Option.Some(role), Option.Some(roleMethod), Option.Some(roleMethod.method));
+			replaceInExpr(
+				roleMethod.method.expr, 
+				Option.Some(role), 
+				Option.Some(roleMethod), 
+				Option.Some(roleMethod.method)
+			);
 		}		
 	}
 
 	function replaceField(field : Field) {
 		switch(field.kind) {
-			case FVar(_, e): if(e != null) replaceInExpr(e, Option.None, Option.None, Option.None);
-			case FFun(f): if(f.expr != null) replaceInExpr(f.expr, Option.None, Option.None, Option.Some(f));
-			case FProp(_, _, _, e): if(e != null) replaceInExpr(e, Option.None, Option.None, Option.None);
+			case FVar(_, e): 
+				if(e != null) replaceInExpr(e, Option.None, Option.None, Option.None);
+			case FFun(f): 
+				if(f.expr != null) replaceInExpr(f.expr, Option.None, Option.None, Option.Some(f));
+			case FProp(_, _, _, e): 
+				if(e != null) replaceInExpr(e, Option.None, Option.None, Option.None);
 		}
 	}
 
-	function replaceInExpr(e : Expr, currentRole : Option<DciRole>, currentRoleMethod : Option<DciRoleMethod>, currentFunction : Option<Function>) {
+	function replaceInExpr(
+		e : Expr, 
+		currentRole : Option<DciRole>, 
+		currentRoleMethod : Option<DciRoleMethod>, 
+		currentFunction : Option<Function>
+	) {
 		var role : DciRole = switch currentRole {
 			case None: null;
 			case Some(role): role;
 		};
 		
-		switch(e.expr) {
-			case EFunction(_, f) if (f.expr != null): 
-				// Change function, to check for role bindings is same function
-				replaceInExpr(f.expr, currentRole, currentRoleMethod, Some(f)); 
-				return;
-			case EField(_, _) | EConst(CIdent(_)):
-				// Fields could be changed to role__method
-				replaceIdentifiers(e, currentRole);
+		function testContractAccess(accessedRole : DciRole, contractMethod : Field, pos : Position) {
+			if (accessedRole == role) return;
+			
+			if (!contractMethod.access.has(APrivate))
+				Context.warning('Contract field ${accessedRole.name}.${contractMethod.name} accessed outside its Role.', pos);
+			else
+				Context.error('Cannot access private contract field ${accessedRole.name}.${contractMethod.name} outside its Role.', pos);
+		}		
+		
+		// Test if a Role-object-contract or RoleMethod is accessed outside its Role
+		function testRoleMethodAccess(accessedRole : DciRole, accessedRoleMethod : DciRoleMethod, pos : Position) {
+			if (accessedRole == role) return;
+			
+			if (!accessedRoleMethod.isPublic) {
+				Context.error('Cannot access private RoleMethod ${accessedRole.name}.${accessedRoleMethod.name} outside its Role.', pos);
+			}
+		}
+		
+		switch e.expr {
+			/*
+				 // role.roleMethod(...)
+			case ECall({
+				expr: EField({
+					expr: EConst(CIdent(roleName)), 
+					pos: _
+				}, field), 
+				pos: _
+			}, params) 
+			|	// this.role.roleMethod(...)
+				ECall({
+				expr: EField({
+					expr: EField({
+						expr: EConst(CIdent("this")),
+						pos: _
+					}, roleName),
+					pos: _
+				}, field), 
+				pos: _
+			}, params)
+				if(roleName == "self" || roles.exists(roleName)): {
+					if (roleName == "self") roleName = role.name;
+					
+					var role = roles.get(roleName);
+					if(role.roleMethods.exists(function(rm) return rm.name == field)) {
+						e.expr = ECall({
+							expr: EConst(CIdent(roleName + "__" + field)), 
+							pos: e.pos
+						}, params);
+					}
+				}
+			*/
+			
+			// role.roleMethod, this.role.roleMethod
+			case EField({expr: EConst(CIdent(roleName)), pos: _}, field) | 
+				 EField({expr: EField({expr: EConst(CIdent("this")), pos: _}, roleName), pos: _}, field)
+				if (roleName == "self" || roles.exists(roleName)): {
+					if (roleName == "self") roleName = role.name;
+					var role = roles.get(roleName);
+					
+					var roleMethod = role.roleMethods.find(function(rm) return rm.name == field);
+					if(roleMethod != null) {
+						e.expr = EConst(CIdent(roleName + "__" + field));
+						testRoleMethodAccess(role, roleMethod, e.pos);
+					} else {
+						var contractMethod = role.contract.find(function(c) return c.name == field);
+						if (contractMethod != null) {
+							testContractAccess(role, contractMethod, e.pos);
+						}
+					}
+				}
+			
+			// self
+			case EConst(CIdent(roleName)) if (roleName == "self"):
+				e.expr = EConst(CIdent(role.name));
+			
 			case EConst(CString(s)) if (role != null && e.toString().charAt(0) == "'"):
 				// Interpolation strings must be expanded and iterated, in case "self" is hidden there.
 				e.expr = Format.format(e).expr;
 			case EBinop(OpAssign, e1, e2): 
 				// Potential role bindings, check if all are bound in same function
 				setRoleBindPos(e1, currentRole, currentFunction);
+				
+			case EFunction(_, f) if (f.expr != null): 
+				// Change function, to check for role bindings in same function
+				replaceInExpr(f.expr, currentRole, currentRoleMethod, Some(f)); 
+				return;
+				
 			case EDisplay(e, isCall):
 				new Autocompletion(context, role).replaceDisplay(e, isCall);
+				return;
+				
 			case _:
 		}
 
@@ -96,17 +182,15 @@ class RoleMethodReplacer
 
 	// Returns true if a Role was successfully bound in the Expr.
 	function setRoleBindPos(e : Expr, currentRole : Option<DciRole>, currentFunction : Option<Function>) : Bool {
-		var fieldArray = extractIdentifier(e, currentRole);
-		if (fieldArray == null) return false;
-		if (fieldArray[0] == "this") fieldArray.shift();
-		if (fieldArray.length != 1)	return false;
+		switch e.expr {
+			case EField({expr: EConst(CIdent("this")), pos: _}, roleName) | EConst(CIdent(roleName))
+				if (roles.exists(roleName)):
+					// Set where the Role was bound in the Context.
+					roles.get(roleName).bound = e.pos;
+			case _:
+				return false;
+		}
 		
-		var boundRole = roles.get(fieldArray[0]);
-		if (boundRole == null) return false;
-
-		// Set where the Role was bound in the Context.
-		boundRole.bound = e.pos;
-
 		return switch(currentFunction) {
 			case None: 
 				Context.error('Role must be bound in a Context method!', e.pos);
@@ -132,6 +216,7 @@ class RoleMethodReplacer
 	 * Returns an array of identifiers from the current expression,
 	 * or null if the expression isn't an EField or EConst.
 	 */
+	/*
 	function extractIdentifier(e : Expr, currentRole : Option<DciRole>) : Null<Array<String>> {
 		var fields = [];
 		while (true) {
@@ -157,11 +242,13 @@ class RoleMethodReplacer
 			}
 		}
 	}
+	*/
 	
 	/**
 	 * Given that console is a Role, rewriting 
 	 * [console, cursor, pos] to [console__cursor, pos]
 	 */
+	/*
 	function replaceIdentifiers(e : Expr, currentRoleOption : Option<DciRole>) : Bool {
 		var fieldArray = extractIdentifier(e, currentRoleOption);
 		if (fieldArray == null) return false;
@@ -202,7 +289,7 @@ class RoleMethodReplacer
 		if (fieldArray.length > 1) {
 			var potentialRoleMethod = fieldArray[1];
 			
-			if(roles.exists(potentialRole)) {		
+			if(roles.exists(potentialRole)) {
 				// Test if a Role-object-contract or RoleMethod is accessed outside its Role
 				if (!Context.defined("display") && !DciContextBuilder.publicRoleAccess && 
 					(currentRole == null || currentRole.name != potentialRole)) 
@@ -237,6 +324,7 @@ class RoleMethodReplacer
 		
 		e.expr = (macro $p{fieldArray}).expr;
 		return true;
-	}	
+	}
+	*/
 }
 #end

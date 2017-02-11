@@ -9,13 +9,18 @@ class Tests extends BuddySuite implements Buddy<[Tests]> {
 				var savings = new Account("Savings", 1000);
 				var home = new Account("Home", 0);
 
-				new MoneyTransfer(savings, home, 500).transfer();
+				var transfer = new MoneyTransfer(savings, home, 500);
 
+				transfer.transfer();
 				savings.balance.should.be(500);
 				home.balance.should.be(500);
+				
+				transfer.transfer2();
+				savings.balance.should.be(0);
+				home.balance.should.be(1000);				
 			});
 
-           it("should return properly using the 'dci.Self' type", {
+			it("should return properly using the 'dci.Self' type", {
 				var savings = new AccountSelf("Savings", 1000);
 				var home = new AccountSelf("Home", 0);
 
@@ -60,16 +65,28 @@ class MoneyTransfer implements dci.Context {
     }
 
     public function transfer() {
+		// Testing direct call
         this.source.withdraw();
     }
+	
+    public function transfer2() {
+		// Testing method var assignment
+		var m = this.source.withdraw;
+		m();
+    }	
 
     @role var source : {
 		function decreaseBalance(a : Int) : Void;
 
         public function withdraw() {
             self.decreaseBalance(amount);
-            destination.deposit();
+			var m = destination.deposit;
+            m();
         }
+		
+		function privateWithdraw() {
+			trace("yada");
+		}
     }
 
     @role var destination : {
@@ -80,7 +97,7 @@ class MoneyTransfer implements dci.Context {
 			return true;
         }
 
-        function test2() return deposit();		
+        function test2() return self.deposit();		
 		function now() return Date.now();
     }
 
@@ -140,7 +157,6 @@ class AccountSelf {
 		}
 
 		public function withdraw() {
-			
             self.decreaseBalance(Std.int(amount / 2));
 			// Testing RoleMethod access inside own role
 			self.addSource(self).decreaseBalance(Std.int(amount / 2));
@@ -156,7 +172,7 @@ class AccountSelf {
 		public var namePublic(default, null) : String;
 		
         public function deposit() {
-            testDestination = self.increaseBalance(amount).name + namePublic + namePrivate;
+            testDestination = self.increaseBalance(amount).name + self.namePublic + self.namePrivate;
         }
     }
 }

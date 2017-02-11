@@ -15,33 +15,12 @@ using haxe.macro.ExprTools;
 
 class DciContextBuilder
 {
-	public static var allowThisInRoleMethods = false;
-	public static var publicRoleAccess = false;
-	
 	public static function build() : Array<Field> {
 		var context = new DciContext(Context.getLocalClass().get(), Context.getBuildFields());
 
-		/*
-		trace('===== Context ' + cls.name + ' =================');
-		trace('Fields: ' + context.fields.map(function(f) return f.name));
-		for (role in context.roles) {
-			trace('Role: ' + role.name + ' ' + role.contract.map(function(r) return r.name));
-			trace("\\-- " + role.roleMethods.map(function(rm) return rm.name));
-		}
-		*/
-		
-		// Rewrite RoleMethod calls (destination.deposit -> destination__desposit)
+		// Rewrite RoleMethod calls (destination.deposit -> destination__deposit)
 		new RoleMethodReplacer(context).replaceAll();
 		
-		if (!Context.defined("display")) {
-			// After all replacement is done, test if all roles are bound.
-			for (r in context.roles) if(r.bound == null) {
-				Context.warning("Role " + r.name + " isn't bound in its Context.", r.field.pos);
-			}
-		} else {
-			//Autocompletion.fileTrace(contextData(context));
-		}
-
 		return context.buildFields();
 	}
 
