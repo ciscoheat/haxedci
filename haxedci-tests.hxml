@@ -3,3 +3,4 @@
 -cp tests
 -main Tests
 -neko bin/haxedci-tests.n
+--times

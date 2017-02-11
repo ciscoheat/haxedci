@@ -46,10 +46,12 @@ class DciContext {
 			function incorrectTypeError() {
 				Context.error("A Role must have an anonymous structure as its contract. " +
 					"See http://haxe.org/manual/types-anonymous-structure.html for syntax.", roleField.pos);
+				return null;
 			}
 			function basicTypeError(name) {
 				Context.error(name + " is a basic type (Int, Bool, Float, String), only objects can play a Role in a Context. " + 
 					"You can make it a normal field instead, or pass it as a parameter.", roleField.pos);
+				return null;
 			}
 			
 			return switch roleField.kind {
@@ -60,29 +62,32 @@ class DciContext {
 						"Remove it and set the affected RoleMethods to public.", e.pos
 					);
 
-					var roleMethods : Array<DciRoleMethod> = [];
-					var contract : Array<Field> = [];
-
-					switch t {
-						case TAnonymous(fields): for (f in fields) switch f.kind {
-							case FFun(fun) if (fun.expr != null):
-								var roleMethodField = {
-									pos: f.pos,
-									name: roleField.name + '__' + f.name,
-									// TODO: Breaks autocompletion inside RoleMethods 
-									//meta: [{ pos: roleMethod.method.expr.pos, params: [], name: ":noCompletion" }],
-									meta: null,
-									kind: FFun(fun),
-									doc: null,
-									access: f.access
-								};
-								
-								roleMethods.push(new DciRoleMethod(
-									f.name, roleMethodField, f.access != null && f.access.has(APublic)
-								));
-							case _:
-								contract.push(f);
-						}
+					return switch t {
+						case TAnonymous(fields): 
+							var roleMethods : Array<DciRoleMethod> = [];
+							var contract : Array<Field> = [];
+							
+							for (f in fields) switch f.kind {
+								case FFun(fun) if (fun.expr != null):
+									var roleMethodField = {
+										pos: f.pos,
+										name: roleField.name + '__' + f.name,
+										// TODO: Breaks autocompletion inside RoleMethods 
+										//meta: [{ pos: roleMethod.method.expr.pos, params: [], name: ":noCompletion" }],
+										meta: null,
+										kind: FFun(fun),
+										doc: null,
+										access: f.access
+									};
+									
+									roleMethods.push(new DciRoleMethod(
+										f.name, roleMethodField, f.access != null && f.access.has(APublic)
+									));
+								case _:
+									contract.push(f);
+							}
+							
+							new DciRole(cls, roleField, roleMethods, contract);
 
 						case TPath( { name: "Int", pack: [], params: [] } ): basicTypeError("Int");
 						case TPath( { name: "Bool", pack: [], params: [] } ): basicTypeError("Bool");
@@ -91,10 +96,6 @@ class DciContext {
 							
 						case _: incorrectTypeError();
 					}
-					
-					// Set role type
-					roleField.kind = FVar(TAnonymous(contract));
-					new DciRole(cls, roleField, roleMethods, contract);
 					
 				case _: 
 					Context.error("Only var fields can be a Role.", roleField.pos);
@@ -140,87 +141,92 @@ class DciRole {
 	}
 	
 	public function new(contextType : ClassType, field : Field, roleMethods : Array<DciRoleMethod>, contract : Array<Field>) {
-
-		var fieldType : ComplexType = switch field.kind {
-			case FVar(t, _): t;
-			case _: null;
-		}
-
-		if (fieldType == null || fieldType.getName() != "TAnonymous") throw "contract wasn't TAnonymous";
-		
-		this.contract = switch fieldType {
-			case TAnonymous(fields): contract.concat(fields);
-			case _: contract;
-		}
-		
 		// Test for RoleMethod/contract name collisions
-		for (r in roleMethods) {
-			var contract = this.contract.find(function(c) return c.name == r.name);
-			if (contract != null) {
+		var methods = [for (r in roleMethods) r.name => r];
+
+		for (c in contract) {
+			if (methods.exists(c.name)) {
+				var r = methods.get(c.name);
 				haxe.macro.Context.warning("RoleMethod/contract name collision for field " + r.name, r.method.expr.pos);
-				haxe.macro.Context.error("RoleMethod/contract name collision for field " + r.name, contract.pos);
+				haxe.macro.Context.error("RoleMethod/contract name collision for field " + r.name, c.pos);
 			}
 		}
 		
-		/*
-		function testSelfReference(type : Null<ComplexType>) : ComplexType {
-			return if (type == null) null
-			else switch type {
-				case TPath({sub: _, params: _, pack: ["dci"], name: "Self"}) | TPath({sub: _, params: _, pack: [], name: "Self"}):
-					if (selfType == null) {
-						var classPackage = contextType.name.charAt(0).toLowerCase() + contextType.name.substr(1);
-						var pack = ['dci'].concat(contextType.pack).concat([classPackage]);
-						var name = field.name;
-						
-						// Define a custom type, to avoid circular referencing of TAnonymous
-						haxe.macro.Context.defineType({
-							pos: field.pos,
-							params: null,
-							pack: pack,
-							name: name,
-							meta: null,
-							kind: TDStructure,
-							isExtern: false,
-							fields: this.contract
-						});
-						
-						selfType = TPath( { sub: null, params: null, pack: pack, name: name } );
-					}
-					selfType;
-				case _:
-					type;
-			}
-		}
-		
+		// Create type for Role
+		// TODO: Don't use in display mode?
+
+		var pack = contextType.pack;
+		var name = contextType.name + field.name.charAt(0).toUpperCase() + field.name.substr(1);
+		var selfType = TPath( { sub: null, params: null, pack: ["dci"], name: "Self" } );
+		var hasSelfType = false;
+
 		// Test if a field references Self, then change that type to the fieldType
-		for (field in this.contract) {
-			field.kind = switch field.kind {
-				case FVar(type, e): 
-					FVar(testSelfReference(type));
-				case FFun(f):
-					for (arg in f.args) arg.type = testSelfReference(arg.type);
-					f.ret = testSelfReference(f.ret);
-					FFun(f);
-				case FProp(get, set, t, e):
-					FProp(get, set, testSelfReference(t), e);
+		function replaceSelfReference() {
+			
+			function testSelfReference(type : Null<ComplexType>) : ComplexType {
+				return if (type == null) null
+				else switch type {
+					case TPath({sub: _, params: _, pack: [], name: "Self"}) | TPath({sub: _, params: _, pack: ["dci"], name: "Self"}):
+						hasSelfType = true;
+						selfType;
+					case _:
+						type;
+				}
+			}
+			
+			for (field in contract) {
+				field.kind = switch field.kind {
+					case FVar(type, e): 
+						FVar(testSelfReference(type));
+					case FFun(f):
+						for (arg in f.args) arg.type = testSelfReference(arg.type);
+						f.ret = testSelfReference(f.ret);
+						FFun(f);
+					case FProp(get, set, t, e):
+						FProp(get, set, testSelfReference(t), e);
+				}
+			}
+			
+			for (roleMethod in roleMethods) {
+				roleMethod.method.ret = testSelfReference(roleMethod.method.ret);
+				for (arg in roleMethod.method.args) arg.type = testSelfReference(arg.type);
 			}
 		}
-		for (roleMethod in roleMethods) {
-			roleMethod.method.ret = testSelfReference(roleMethod.method.ret);
-			for (arg in roleMethod.method.args) arg.type = testSelfReference(arg.type);
-		}
-		*/
+		
+		// The first pass changes "Self" to "dci.Self", because defineType doesn't have access
+		// to any imported modules.
+		replaceSelfReference();
+		
+		// Define the RoleObjectContract as a custom type, to avoid circular referencing of TAnonymous
+		haxe.macro.Context.defineType({
+			pos: field.pos,
+			params: null,
+			pack: pack,
+			name: name,
+			meta: null,
+			kind: TDStructure,
+			isExtern: false,
+			fields: contract
+		});
+
+		// Reassign selfType, so it can be used in the replacement.
+		selfType = TPath( { sub: null, params: null, pack: pack, name: name } );		
+		
+		// Now when the type is created, we can replace "dci.Self" with the new type.
+		if(hasSelfType) replaceSelfReference();
 		
 		this.field = {
 			pos: field.pos,
 			name: field.name,
-			meta: null,
-			kind: FVar(fieldType, null), // Important to set expr to null, to remove the body code
-			doc: null,
+			meta: field.meta,
+			kind: FVar(selfType, null),
+			//kind: FVar(TAnonymous(contract), null),
+			doc: field.doc,
 			access: [APrivate]
 		};
 		
 		this.roleMethods = roleMethods;
+		this.contract = contract;
 	}
 }
 

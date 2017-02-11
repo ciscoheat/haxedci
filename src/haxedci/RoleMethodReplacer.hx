@@ -86,6 +86,7 @@ class RoleMethodReplacer
 			case EBinop(OpAssign, e1, e2): 
 				// Potential role bindings, check if all are bound in same function
 				setRoleBindPos(e1, currentRole, currentFunction);
+			/*
 			case EDisplay(e, isCall): switch e.expr {
 				case EConst(CIdent(s)):
 					var displayRole = context.roles.find(function(role) return role.name == s);
@@ -105,6 +106,7 @@ class RoleMethodReplacer
 					//fileTrace(context.fields.map(function(f) return f.name));
 				case _:
 			}
+			*/
 			case _:
 		}
 
