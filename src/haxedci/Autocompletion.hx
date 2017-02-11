@@ -17,28 +17,22 @@ class Autocompletion
 {
 	#if macro
 	var context : DciContext;
-	var currentRole : DciRole;
+	var currentRole : Null<DciRole>;
 
 	public function new(context : DciContext, currentRole : DciRole) {
 		if (context == null) throw "context cannot be null.";
-		if (currentRole == null) throw "currentRole cannot be null.";
 		this.context = context;
 		this.currentRole = currentRole;
 	}
 	
-	public function searchForDisplay(roleMethod : DciRoleMethod) : Bool {
-		var e = findEDisplay(roleMethod.method.expr);
-		if (e != null) switch(e.expr) {
-			case EDisplay(e2, isCall):
-				e2.expr = EConst(CString("test"));
-				//fileTrace((isCall ? '[call] ' : '') + e2.toString());
-				//fileTrace(e2.expr);
+	// e is the Expr inside EDisplay
+	public function replaceDisplay(e : Expr, isCall : Bool) {
+		switch e.expr {
+			case EConst(CIdent(s)):
+				
 			case _:
 		}
-		return e != null;
-	}
-	
-	public function fieldKindForRole(currentRole : DciRole) : FieldType {
+		/*
 		// Transform the RoleMethods to Array<Field>
 		var fields = [for (rm in currentRole.roleMethods) {
 			pos: rm.method.expr.pos,
@@ -65,6 +59,7 @@ class Autocompletion
 		//DciContextBuilder.fileTrace(context.name + '.' + currentRole.name + ': ' + fields.map(function(f) return f.name));
 			
 		return FVar(TAnonymous(fields));
+		*/
 	}
 	
 	// Return the function type or Dynamic as default. This makes autocompletion work

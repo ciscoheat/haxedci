@@ -73,8 +73,8 @@ class DciContext {
 										pos: f.pos,
 										name: roleField.name + '__' + f.name,
 										// TODO: Breaks autocompletion inside RoleMethods 
-										//meta: [{ pos: roleMethod.method.expr.pos, params: [], name: ":noCompletion" }],
-										meta: null,
+										meta: [{ pos: f.pos, params: [], name: ":noCompletion" }],
+										//meta: null,
 										kind: FFun(fun),
 										doc: null,
 										access: f.access

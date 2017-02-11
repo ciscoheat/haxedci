@@ -86,27 +86,8 @@ class RoleMethodReplacer
 			case EBinop(OpAssign, e1, e2): 
 				// Potential role bindings, check if all are bound in same function
 				setRoleBindPos(e1, currentRole, currentFunction);
-			/*
-			case EDisplay(e, isCall): switch e.expr {
-				case EConst(CIdent(s)):
-					var displayRole = context.roles.find(function(role) return role.name == s);
-					if (displayRole != null) {
-						e.expr = ECheckType(macro null, TAnonymous(displayRole.publicApi()));
-					}
-					//fileTrace("---------------------");
-					//fileTrace(e);
-					switch currentRoleMethod {
-						case None:						
-						case Some(roleMethod): roleMethod.hasDisplay = true;
-					}
-					//fileTrace("---------------------");
-					//fileTrace(e);
-					//fileTrace(DciContextBuilder.contextData(context));
-					//fileTrace(role.roleMethods.map(function(f) return f.name));
-					//fileTrace(context.fields.map(function(f) return f.name));
-				case _:
-			}
-			*/
+			case EDisplay(e, isCall):
+				new Autocompletion(context, role).replaceDisplay(e, isCall);
 			case _:
 		}
 
