@@ -73,7 +73,7 @@ class DciContext {
 										pos: f.pos,
 										name: roleField.name + '__' + f.name,
 										// TODO: Breaks autocompletion inside RoleMethods 
-										meta: [{ pos: f.pos, params: [], name: ":noCompletion" }],
+										//meta: [{ pos: f.pos, params: [], name: ":noCompletion" }],
 										//meta: null,
 										kind: FFun(fun),
 										doc: null,
@@ -166,7 +166,8 @@ class DciRole {
 			function testSelfReference(type : Null<ComplexType>) : ComplexType {
 				return if (type == null) null
 				else switch type {
-					case TPath({sub: _, params: _, pack: [], name: "Self"}) | TPath({sub: _, params: _, pack: ["dci"], name: "Self"}):
+					case TPath( { sub: _, params: _, pack: [], name: "Self" } ) | 
+						 TPath({sub: _, params: _, pack: ["dci"], name: "Self"}):
 						hasSelfType = true;
 						selfType;
 					case _:

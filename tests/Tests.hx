@@ -92,7 +92,7 @@ class MoneyTransfer implements dci.Context {
     @role var destination : {
         function increaseBalance(a : Int) : Void;
 
-        public function deposit() {
+        public function deposit() {			
             self.increaseBalance(amount);
 			return true;
         }
@@ -151,7 +151,7 @@ class AccountSelf {
     @role var source : {
         function decreaseBalance(a : Int) : Self;
 
-		function addSource(a : Self) : Self {			
+		function addSource(a : Self) : Self {
 			testSource += destination.namePublic;
 			return a;
 		}

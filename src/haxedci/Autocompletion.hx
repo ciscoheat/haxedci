@@ -17,49 +17,60 @@ class Autocompletion
 {
 	#if macro
 	var context : DciContext;
-	var currentRole : Null<DciRole>;
+	var currentRoleName : String;
+	var roles = new Map<String, DciRole>();
 
-	public function new(context : DciContext, currentRole : DciRole) {
+	public function new(context : DciContext, currentRole : Option<DciRole>) {
 		if (context == null) throw "context cannot be null.";
 		this.context = context;
-		this.currentRole = currentRole;
+		this.currentRoleName = switch currentRole {
+			case None: null;
+			case Some(role): role.name;
+		};
+		
+		for (role in context.roles)
+			roles.set(role.name, role);
 	}
 	
 	// e is the Expr inside EDisplay
-	public function replaceDisplay(e : Expr, isCall : Bool) {
+	public function replaceDisplay(e : Expr, isCall : Bool) {		
+
 		switch e.expr {
-			case EConst(CIdent(s)):
-				
+			case EConst(CIdent(roleName)) | EField({expr: EConst(CIdent("this")), pos: _}, roleName)
+				if (roleName == "self" || roles.exists(roleName)): {
+					if (roleName == "self") roleName = currentRoleName;
+					
+					var role = roles.get(roleName);
+					// Transform the RoleMethods to Array<Field>
+					var fields = [for (rm in role.roleMethods) {
+						pos: rm.method.expr.pos,
+						name: rm.name,
+						meta: null,
+						kind: FFun({
+							ret: functionType(rm.method),
+							params: rm.method.params,
+							expr: null,
+							args: rm.method.args
+						}),
+						doc: null,
+						access: rm.isPublic ? [APublic] : [APrivate]
+					}];
+
+					// If we're inside the role that's autocompleted, add its contract fields to output.
+					if (currentRoleName == role.name)
+						fields = fields.concat(role.contract);
+					else
+						fields = fields.filter(
+							function(f) return f.access != null && f.access.has(APublic)
+						)
+						.concat(role.contract.filter(
+							function(f) return f.access != null && f.access.has(APublic))
+						);
+						
+					e.expr = ECheckType(macro null, TAnonymous(fields));
+				}
 			case _:
 		}
-		/*
-		// Transform the RoleMethods to Array<Field>
-		var fields = [for (rm in currentRole.roleMethods) {
-			pos: rm.method.expr.pos,
-			name: rm.name,
-			meta: null,
-			kind: FFun({
-				ret: functionType(rm.method),
-				params: rm.method.params,
-				expr: null,
-				args: rm.method.args
-			}),
-			doc: null,
-			access: rm.isPublic ? [APublic] : [APrivate]
-		}];
-
-		// If we're inside the role that's autocompleted, add its contract fields to output.
-		if (currentRole == currentDisplayRole())
-			fields = fields.concat(currentRole.contract);
-		else
-			fields = fields.filter(function(f) return f.access != null && f.access.has(APublic)).concat(
-				currentRole.contract.filter(function(f) return f.access != null && f.access.has(APublic)
-			));
-			
-		//DciContextBuilder.fileTrace(context.name + '.' + currentRole.name + ': ' + fields.map(function(f) return f.name));
-			
-		return FVar(TAnonymous(fields));
-		*/
 	}
 	
 	// Return the function type or Dynamic as default. This makes autocompletion work
@@ -69,24 +80,6 @@ class Autocompletion
 			? func.ret
 			: TPath( { sub: null, params: null, pack: [], name: "Dynamic" } );
 	}	
-
-	function currentDisplayRole() : DciRole {
-		for (role in context.roles) for (rm in role.roleMethods) {
-			if (findEDisplay(rm.method.expr) != null) return role;
-		}
-		
-		return null;
-	}
-
-	function findEDisplay(e : Expr) : Expr {
-		var output : Expr = null;
-		function iterForEDisplay(e : Expr) switch e.expr {
-			case EDisplay(_, _): output = e;
-			case _: e.iter(iterForEDisplay);
-		}
-		iterForEDisplay(e);
-		return output;
-	}
 	#end
 	
 	///////////////////////////////////////////////////////////////////////////
