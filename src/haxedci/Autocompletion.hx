@@ -18,15 +18,23 @@ class Autocompletion
 	#if macro
 	var context : DciContext;
 	var currentRoleName : String;
+	var currentRoleMethod : DciRoleMethod;
 	var roles = new Map<String, DciRole>();
 
-	public function new(context : DciContext, currentRole : Option<DciRole>) {
+	public function new(context : DciContext, currentRole : Option<DciRole>, currentRoleMethod : Option<DciRoleMethod>) {
 		if (context == null) throw "context cannot be null.";
+		
 		this.context = context;
+
 		this.currentRoleName = switch currentRole {
 			case None: null;
 			case Some(role): role.name;
 		};
+		
+		context.autocomplete = switch currentRoleMethod {
+			case None: null;
+			case Some(roleMethod): roleMethod;
+		}
 		
 		for (role in context.roles)
 			roles.set(role.name, role);
@@ -53,12 +61,13 @@ class Autocompletion
 							args: rm.method.args
 						}),
 						doc: null,
-						access: rm.isPublic ? [APublic] : [APrivate]
+						access: [APublic]// rm.isPublic ? [APublic] : [APrivate]
 					}];
 
 					// If we're inside the role that's autocompleted, add its contract fields to output.
-					if (currentRoleName == role.name)
+					if (currentRoleName == role.name) {
 						fields = fields.concat(role.contract);
+					}
 					else
 						fields = fields.filter(
 							function(f) return f.access != null && f.access.has(APublic)

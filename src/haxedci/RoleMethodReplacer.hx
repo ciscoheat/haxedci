@@ -45,7 +45,7 @@ class RoleMethodReplacer
 		}
 		
 		// After all replacement is done, test if all roles are bound.
-		if (!Context.defined("display")) {
+		if (!displayMode) {
 			for (r in context.roles) if(r.bound == null) {
 				Context.warning("Role " + r.name + " isn't bound in its Context.", r.field.pos);
 			}
@@ -84,22 +84,26 @@ class RoleMethodReplacer
 			case None: null;
 			case Some(role): role;
 		};
-		
+
+		// Test if a contract field is accessed outside its Role
 		function testContractAccess(accessedRole : DciRole, contractMethod : Field, pos : Position) {
 			if (accessedRole == role) return;
 			
 			if (!contractMethod.access.has(APrivate))
-				Context.warning('Contract field ${accessedRole.name}.${contractMethod.name} accessed outside its Role.', pos);
+				Context.warning('Contract field ${accessedRole.name}.${contractMethod.name} ' + 
+					'accessed outside its Role.', pos);
 			else
-				Context.error('Cannot access private contract field ${accessedRole.name}.${contractMethod.name} outside its Role.', pos);
+				Context.error('Cannot access private contract field ' + 
+				'${accessedRole.name}.${contractMethod.name} outside its Role.', pos);
 		}		
 		
-		// Test if a Role-object-contract or RoleMethod is accessed outside its Role
+		// Test if a RoleMethod is accessed outside its Role
 		function testRoleMethodAccess(accessedRole : DciRole, accessedRoleMethod : DciRoleMethod, pos : Position) {
 			if (accessedRole == role) return;
 			
 			if (!accessedRoleMethod.isPublic) {
-				Context.error('Cannot access private RoleMethod ${accessedRole.name}.${accessedRoleMethod.name} outside its Role.', pos);
+				Context.error('Cannot access private RoleMethod ' + 
+				'${accessedRole.name}.${accessedRoleMethod.name} outside its Role.', pos);
 			}
 		}
 		
@@ -127,20 +131,22 @@ class RoleMethodReplacer
 			case EConst(CIdent(roleName)) if (roleName == "self"):
 				e.expr = EConst(CIdent(role.name));
 			
+			// Interpolation strings must be expanded and iterated, in case "self" is hidden there.
 			case EConst(CString(s)) if (role != null && e.toString().charAt(0) == "'"):
-				// Interpolation strings must be expanded and iterated, in case "self" is hidden there.
 				e.expr = Format.format(e).expr;
+				
+			// Potential role bindings, check if all are bound in same function
 			case EBinop(OpAssign, e1, e2): 
-				// Potential role bindings, check if all are bound in same function
 				setRoleBindPos(e1, currentRole, currentFunction);
 				
+			// Change function, to check for role bindings in same function
 			case EFunction(_, f) if (f.expr != null): 
-				// Change function, to check for role bindings in same function
 				replaceInExpr(f.expr, currentRole, currentRoleMethod, Some(f)); 
 				return;
-				
+
+			// Autocompletion is different depending on where in the context you are.
 			case EDisplay(e, isCall):
-				new Autocompletion(context, currentRole).replaceDisplay(e, isCall);
+				new Autocompletion(context, currentRole, currentRoleMethod).replaceDisplay(e, isCall);
 				return;
 				
 			case _:
@@ -150,20 +156,21 @@ class RoleMethodReplacer
 	}
 
 	// Returns true if a Role was successfully bound in the Expr.
-	function setRoleBindPos(e : Expr, currentRole : Option<DciRole>, currentFunction : Option<Function>) : Bool {
+	function setRoleBindPos(e : Expr, currentRole : Option<DciRole>, currentFunction : Option<Function>) {
 		switch e.expr {
 			case EField({expr: EConst(CIdent("this")), pos: _}, roleName) | EConst(CIdent(roleName))
 				if (roles.exists(roleName)):
 					// Set where the Role was bound in the Context.
 					roles.get(roleName).bound = e.pos;
 			case _:
-				return false;
+				return;
 		}
 		
-		return switch(currentFunction) {
+		switch(currentFunction) {
 			case None: 
 				Context.error('Role must be bound in a Context method!', e.pos);
 				
+			// set roleBindFunction, but create an error if it already exists somewhere else
 			case Some(f):
 				if (roleBindFunction == null) 
 					roleBindFunction = f;
@@ -177,7 +184,6 @@ class RoleMethodReplacer
 						e.pos
 					);
 				}
-				true;
 		}
 	}
 }

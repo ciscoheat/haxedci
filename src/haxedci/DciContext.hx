@@ -4,6 +4,8 @@ import haxe.macro.Expr;
 import haxe.macro.Type;
 import haxe.macro.Context;
 
+import haxedci.Autocompletion.fileTrace;
+
 using Lambda;
 
 class DciContext {
@@ -11,13 +13,28 @@ class DciContext {
 	public var cls(default, null) : ClassType;
 	public var normalFields(default, null) : Array<Field> = [];
 	public var roles(default, null) : Array<DciRole> = [];
+	public var autocomplete(default, default) : DciRoleMethod;
 	
 	function get_name() return cls.name;
 
 	public function buildFields() : Array<Field> {
+		var displayMode = Context.defined("display");
 		return normalFields.concat(roles.flatMap(function(role) {
-			var map = role.roleMethods.map(function(rm) return rm.field);
-			return [role.field].concat(map);
+			var roleMethodMap = role.roleMethods.array();
+			/*
+			if (autocomplete != null && roleMethodMap.remove(autocomplete)) {
+				//fileTrace("Moving " + autocomplete.name + " to bottom.");
+				roleMethodMap.push(autocomplete);
+			}
+			*/
+			return [role.field].concat(roleMethodMap.map(function(rm) { 
+				if (displayMode && rm.method.ret == null) {
+					//fileTrace('Setting ${rm.name} to Dynamic');
+					rm.method.ret = macro : Dynamic;
+					//fileTrace(rm.field.kind.getParameters()[0].ret);
+				}				
+				return rm.field; 				
+			}));
 		}).array());
 	}
 	
@@ -74,7 +91,7 @@ class DciContext {
 										name: roleField.name + '__' + f.name,
 										// TODO: Breaks autocompletion inside RoleMethods 
 										//meta: [{ pos: f.pos, params: [], name: ":noCompletion" }],
-										//meta: null,
+										meta: null,
 										kind: FFun(fun),
 										doc: null,
 										access: f.access

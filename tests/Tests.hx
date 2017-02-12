@@ -80,12 +80,16 @@ class MoneyTransfer implements dci.Context {
 
         public function withdraw() {
             self.decreaseBalance(amount);
-			var m = destination.deposit;
-            m();
+			self.callbackTest(destination.deposit);
+			//var m = destination.deposit; m();
         }
 		
-		function privateWithdraw() {
-			trace("yada");
+		function callbackTest(c : Void -> Bool) {
+			c();
+		}
+		
+		function last() {
+			trace("last method in Role source");
 		}
     }
 
@@ -132,7 +136,7 @@ class AccountSelf {
     }
 }
 
-@:keep class MoneyTransferSelf implements dci.Context {
+class MoneyTransferSelf implements dci.Context {
 	public var testDestination : String = "";
 	public var testSource : String = "";
 
