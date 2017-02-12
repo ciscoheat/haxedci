@@ -1,6 +1,12 @@
 import buddy.*;
 import dci.Self;
+import haxe.io.Path;
+import sys.FileSystem;
+import sys.io.Process;
+
 using buddy.Should;
+using Lambda;
+using StringTools;
 
 class Tests extends BuddySuite implements Buddy<[Tests]> {
     public function new() {
@@ -32,7 +38,19 @@ class Tests extends BuddySuite implements Buddy<[Tests]> {
 
 				transfer.testDestination.should.be("HomeHomePublicHomePrivate");
 				transfer.testSource.should.be("HomePublic");
-			});			
+			});	
+			
+			it("should fail compilation for a number of cases", {
+				var files = FileSystem.readDirectory(Path.join([Sys.getCwd(), 'tests']))
+				.filter(function(filename) return filename.startsWith("CompilationTest"));
+				
+				for (filename in files) {
+					var process = new Process("haxe", ['-cp', 'src', '-cp', 'tests', '-x', filename]);
+					if (process.exitCode() == 0)
+						fail(filename + " passed compilation.");
+					process.close();
+				}
+			});
 		});
     }
 }

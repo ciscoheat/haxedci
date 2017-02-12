@@ -89,7 +89,7 @@ class RoleMethodReplacer
 		function testContractAccess(accessedRole : DciRole, contractMethod : Field, pos : Position) {
 			if (accessedRole == role) return;
 			
-			if (!contractMethod.access.has(APrivate))
+			if (contractMethod.access.has(APublic))
 				Context.warning('Contract field ${accessedRole.name}.${contractMethod.name} ' + 
 					'accessed outside its Role.', pos);
 			else
