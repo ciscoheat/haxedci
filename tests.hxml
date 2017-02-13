@@ -1,0 +1,3 @@
+-lib buddy
+-cp tests
+-main Tests
