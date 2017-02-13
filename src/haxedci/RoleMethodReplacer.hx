@@ -130,7 +130,32 @@ class RoleMethodReplacer
 			// self
 			case EConst(CIdent(roleName)) if (roleName == "self"):
 				e.expr = EConst(CIdent(role.name));
-			
+
+			// Direct roleMethod or contract access
+			case EConst(CIdent(field)) if (role != null):
+				var rmCall = role.roleMethods.find(function(rm) return rm.name == field);
+				if (rmCall != null) e.expr = EConst(CIdent(role.name + "__" + field));
+				else {
+					var contractCall = role.contract.find(function(c) return c.name == field);
+					if (contractCall != null) {
+						e.expr = EField({expr: EConst(CIdent(role.name)), pos: e.pos}, field);
+					}
+				}
+				
+			// Direct roleMethod or contract call
+			case ECall({expr: EConst(CIdent(field)), pos: _}, params) if(role != null):
+				var rmCall = role.roleMethods.find(function(rm) return rm.name == field);
+				if (rmCall != null) { 
+					e.expr = ECall({expr: EConst(CIdent(role.name + "__" + field)), pos: e.pos}, params);
+				}
+				else {
+					var contractCall = role.contract.find(function(c) return c.name == field);
+					if (contractCall != null) e.expr = ECall({
+						expr: EField({expr: EConst(CIdent(role.name)), pos: e.pos}, field),
+						pos: e.pos
+					}, params);
+				}
+
 			// Interpolation strings must be expanded and iterated, in case "self" is hidden there.
 			case EConst(CString(s)) if (role != null && e.toString().charAt(0) == "'"):
 				e.expr = Format.format(e).expr;

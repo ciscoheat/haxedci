@@ -19,23 +19,17 @@ class DciContext {
 
 	public function buildFields() : Array<Field> {
 		var displayMode = Context.defined("display");
+		
 		return normalFields.concat(roles.flatMap(function(role) {
 			var roleMethodMap = role.roleMethods.array();
-			/*
-			if (autocomplete != null && roleMethodMap.remove(autocomplete)) {
-				//fileTrace("Moving " + autocomplete.name + " to bottom.");
-				roleMethodMap.push(autocomplete);
-			}
-			*/
 			return [role.field].concat(roleMethodMap.map(function(rm) { 
+				// Fixes some autocompletion problems:
 				if (displayMode && rm.method.ret == null) {
-					//fileTrace('Setting ${rm.name} to Dynamic');
 					rm.method.ret = macro : Dynamic;
-					//fileTrace(rm.field.kind.getParameters()[0].ret);
-				}				
-				return rm.field; 				
+				}
+				return rm.field;
 			}));
-		}).array());
+		}).array());		
 	}
 	
 	public function new(cls : ClassType, buildFields : Array<Field>) {

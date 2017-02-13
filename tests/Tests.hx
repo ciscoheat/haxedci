@@ -1,8 +1,11 @@
 import buddy.*;
 import dci.Self;
+
+#if sys
 import haxe.io.Path;
 import sys.FileSystem;
 import sys.io.Process;
+#end
 
 using buddy.Should;
 using Lambda;
@@ -40,17 +43,21 @@ class Tests extends BuddySuite implements Buddy<[Tests]> {
 				transfer.testSource.should.be("HomePublic");
 			});	
 			
+			#if sys
 			it("should fail compilation for a number of cases", {
-				var files = FileSystem.readDirectory(Path.join([Sys.getCwd(), 'tests']))
-				.filter(function(filename) return filename.startsWith("CompilationTest"));
+				var files = FileSystem.readDirectory('tests').filter(function(filename) 
+					return filename.startsWith("CompilationTest")
+				);
 				
 				for (filename in files) {
 					var process = new Process("haxe", ['-cp', 'src', '-cp', 'tests', '-x', filename]);
-					if (process.exitCode() == 0)
+					if (process.exitCode() == 0) {
 						fail(filename + " passed compilation.");
-					process.close();
+						break;
+					}
 				}
 			});
+			#end
 		});
     }
 }
@@ -83,8 +90,8 @@ class MoneyTransfer implements dci.Context {
     }
 
     public function transfer() {
-		// Testing direct call
-        this.source.withdraw();
+		// Testing direct call		
+        this.source.withdraw();		
     }
 	
     public function transfer2() {
@@ -97,12 +104,12 @@ class MoneyTransfer implements dci.Context {
 		function decreaseBalance(a : Int) : Void;
 
         public function withdraw() {
-            self.decreaseBalance(amount);
-			self.callbackTest(destination.deposit);
-			//var m = destination.deposit; m();
+            decreaseBalance(amount);
+			callbackTest(destination.deposit);
+			//var m = destination.deposit; m(); // will cause autocompletion problems
         }
 		
-		function callbackTest(c : Void -> Bool) {
+		function callbackTest(c : Void -> Bool) {			
 			c();
 		}
 		
@@ -114,12 +121,12 @@ class MoneyTransfer implements dci.Context {
     @role var destination : {
         function increaseBalance(a : Int) : Void;
 
-        public function deposit() {			
+        public function deposit() {
             self.increaseBalance(amount);
 			return true;
         }
 
-        function test2() return self.deposit();		
+        function test2() return self.deposit();
 		function now() return Date.now();
     }
 
@@ -194,7 +201,7 @@ class MoneyTransferSelf implements dci.Context {
 		public var namePublic(default, null) : String;
 		
         public function deposit() {
-            testDestination = self.increaseBalance(amount).name + self.namePublic + self.namePrivate;
+            testDestination = self.increaseBalance(amount).name + namePublic + self.namePrivate;
         }
     }
 }

@@ -61,7 +61,7 @@ class Autocompletion
 							args: rm.method.args
 						}),
 						doc: null,
-						access: [APublic]// rm.isPublic ? [APublic] : [APrivate]
+						access: currentRoleName == role.name || rm.isPublic ? [APublic] : [APrivate]
 					}];
 
 					// If we're inside the role that's autocompleted, add its contract fields to output.
