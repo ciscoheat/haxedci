@@ -13,6 +13,7 @@ haxe:
   
 matrix:
   allow_failures:
+    - os: osx
     - haxe: development
     
 install:
