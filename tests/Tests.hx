@@ -176,6 +176,12 @@ class MoneyTransferSelf implements dci.Context {
     public function transfer() {
         this.source.withdraw();	
     }
+	
+	@role var utils : {
+		public function concat(s1 : String, s2 : String) {
+			return s1 + s2;
+		}
+	}
 
     @role var source : {
         function decreaseBalance(a : Int) : Self;
@@ -201,7 +207,7 @@ class MoneyTransferSelf implements dci.Context {
 		public var namePublic(default, null) : String;
 		
         public function deposit() {
-            testDestination = self.increaseBalance(amount).name + namePublic + self.namePrivate;
+            testDestination = self.increaseBalance(amount).name + utils.concat(namePublic, self.namePrivate);
         }
     }
 }
