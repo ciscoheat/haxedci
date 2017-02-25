@@ -4,8 +4,6 @@ import haxe.macro.Expr;
 import haxe.macro.Type;
 import haxe.macro.Context;
 
-import haxedci.Autocompletion.fileTrace;
-
 using Lambda;
 
 class DciContext {
@@ -18,15 +16,9 @@ class DciContext {
 	function get_name() return cls.name;
 
 	public function buildFields() : Array<Field> {
-		var displayMode = Context.defined("display");
-		
 		return normalFields.concat(roles.flatMap(function(role) {
 			var roleMethodMap = role.roleMethods.array();
 			return [role.field].concat(roleMethodMap.map(function(rm) { 
-				// Fixes some autocompletion problems:
-				if (displayMode && rm.method.ret == null) {
-					rm.method.ret = macro : Dynamic;
-				}
 				return rm.field;
 			}));
 		}).array());		
@@ -127,30 +119,6 @@ class DciRole {
 	
 	function get_name() return field.name;
 
-	var selfType : ComplexType;
-	
-	public function publicApi() : Array<Field> {
-		var methods = roleMethods.filter(function(rm) return rm.isPublic).map(function(rm) return rm.field).concat(
-			contract.filter(function(f) return f.access != null && f.access.has(APublic))
-		);
-		return [for (f in methods) {
-			var fun : Function = cast f.kind.getParameters()[0];
-			{
-				access: f.access,
-				doc: f.doc,
-				kind: FFun({
-					args: fun.args,
-					expr: null,
-					params: fun.params,
-					ret: fun.ret
-				}),
-				meta: f.meta,
-				name: f.name,
-				pos: f.pos
-			}
-		}];
-	}
-	
 	public function new(contextType : ClassType, field : Field, roleMethods : Array<DciRoleMethod>, contract : Array<Field>) {
 		// Test for RoleMethod/contract name collisions
 		var methods = [for (r in roleMethods) r.name => r];

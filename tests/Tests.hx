@@ -2,13 +2,11 @@ import buddy.*;
 import dci.Self;
 
 #if sys
-import haxe.io.Path;
 import sys.FileSystem;
 import sys.io.Process;
 #end
 
 using buddy.Should;
-using Lambda;
 using StringTools;
 
 class Tests extends BuddySuite implements Buddy<[Tests]> {
@@ -90,8 +88,8 @@ class MoneyTransfer implements dci.Context {
     }
 
     public function transfer() {
-		// Testing direct call		
-        this.source.withdraw();		
+		// Testing direct call
+        this.source.withdraw();
     }
 	
     public function transfer2() {
@@ -174,7 +172,7 @@ class MoneyTransferSelf implements dci.Context {
     }
 
     public function transfer() {
-        this.source.withdraw();	
+        this.source.withdraw();			
     }
 	
 	@role var utils : {
@@ -188,7 +186,7 @@ class MoneyTransferSelf implements dci.Context {
 
 		function addSource(a : Self) : Self {
 			testSource += destination.namePublic;
-			return a;
+			return a;			
 		}
 
 		public function withdraw() {

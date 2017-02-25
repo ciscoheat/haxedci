@@ -111,11 +111,12 @@ class RoleMethodReplacer
 			// role.roleMethod, this.role.roleMethod
 			case EField({expr: EConst(CIdent(roleName)), pos: _}, field) | 
 				 EField({expr: EField({expr: EConst(CIdent("this")), pos: _}, roleName), pos: _}, field)
-				if (roleName == "self" || roles.exists(roleName)): {
-					if (roleName == "self") roleName = role.name; // TODO: role is null in display mode
-					var role = roles.get(roleName);
-					
+			if (roleName == "self" || roles.exists(roleName)):
+				try {
+					if (roleName == "self") roleName = role.name;
+					var role = roles.get(roleName);						
 					var roleMethod = role.roleMethods.find(function(rm) return rm.name == field);
+
 					if(roleMethod != null) {
 						e.expr = EConst(CIdent(roleName + "__" + field));
 						if(!displayMode) testRoleMethodAccess(role, roleMethod, e.pos);
@@ -125,11 +126,19 @@ class RoleMethodReplacer
 							if(!displayMode) testContractAccess(role, contractMethod, e.pos);
 						}
 					}
+				} catch(e : Dynamic) {
+					// Autocompletion have problems with RoleMethods,
+					// since it has no full Context. Roles can be null in a RoleMethod.
+					if(!Context.defined('display')) throw e;
 				}
 			
 			// self
 			case EConst(CIdent(roleName)) if (roleName == "self"):
-				e.expr = EConst(CIdent(role.name));
+				if(role == null && Context.defined('display')) {
+					// Same autocompletion problem here, Roles can be null in a RoleMethod.
+				} else {
+					e.expr = EConst(CIdent(role.name));
+				}
 
 			// Direct roleMethod or contract access
 			case EConst(CIdent(field)) if (role != null):

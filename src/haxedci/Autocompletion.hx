@@ -1,6 +1,5 @@
 package haxedci;
 
-import haxe.macro.Format;
 import haxedci.DciContext;
 import haxedci.DciContext.DciRole;
 import haxedci.DciContext.DciRoleMethod;
@@ -8,9 +7,7 @@ import haxedci.DciContext.DciRoleMethod;
 import haxe.ds.Option;
 import haxe.macro.Expr;
 import haxe.macro.Context;
-import haxe.macro.MacroStringTools;
 
-using haxe.macro.ExprTools;
 using Lambda;
 
 class Autocompletion
