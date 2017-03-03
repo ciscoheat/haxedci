@@ -178,7 +178,7 @@ class DciRole {
 		replaceSelfReference();
 		
 		// Define the RoleObjectContract as a custom type, to avoid circular referencing of TAnonymous
-		haxe.macro.Context.defineType({
+		var newRoleType : TypeDefinition = {
 			pos: field.pos,
 			params: null,
 			pack: pack,
@@ -187,11 +187,13 @@ class DciRole {
 			kind: TDStructure,
 			isExtern: false,
 			fields: contract
-		});
+		};
+		
+		Context.defineModule(Context.getLocalModule(), [newRoleType], Context.getLocalImports());
 
 		// Reassign selfType, so it can be used in the replacement.
-		selfType = TPath( { sub: null, params: null, pack: pack, name: name } );		
-		
+		selfType = TPath( { sub: null, params: null, pack: pack, name: name } );
+				
 		// Now when the type is created, we can replace "dci.Self" with the new type.
 		if(hasSelfType) replaceSelfReference();
 		
@@ -200,7 +202,6 @@ class DciRole {
 			name: field.name,
 			meta: field.meta,
 			kind: FVar(selfType, null),
-			//kind: FVar(TAnonymous(contract), null),
 			doc: field.doc,
 			access: [APrivate]
 		};

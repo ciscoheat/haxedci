@@ -4,7 +4,7 @@
   "license": "MIT",
   "tags": ["cross", "dci"],
   "description": "A DCI library with clean syntax and autocompletion.",
-  "version": "1.0.1",
-  "releasenote": "Fixed autocompletion problem with self in RoleMethods.",
+  "version": "1.0.2",
+  "releasenote": "Fixed type import issue by letting Role types define their own module.",
   "contributors": ["ciscoheat"]
 }
