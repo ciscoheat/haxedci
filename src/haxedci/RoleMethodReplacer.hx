@@ -111,9 +111,9 @@ class RoleMethodReplacer
 			// role.roleMethod, this.role.roleMethod
 			case EField({expr: EConst(CIdent(roleName)), pos: _}, field) | 
 				 EField({expr: EField({expr: EConst(CIdent("this")), pos: _}, roleName), pos: _}, field)
-			if (roleName == "self" || roles.exists(roleName)):
+			if (roleName.toLowerCase() == 'self' || roles.exists(roleName)):
 				try {
-					if (roleName == "self") roleName = role.name;
+					if (roleName.toLowerCase() == 'self') roleName = role.name;
 					var role = roles.get(roleName);						
 					var roleMethod = role.roleMethods.find(function(rm) return rm.name == field);
 
@@ -133,7 +133,7 @@ class RoleMethodReplacer
 				}
 			
 			// self
-			case EConst(CIdent(roleName)) if (roleName == "self"):
+			case EConst(CIdent(roleName)) if (roleName.toLowerCase() == "self"):
 				if(role == null && Context.defined('display')) {
 					// Same autocompletion problem here, Roles can be null in a RoleMethod.
 				} else {

@@ -172,7 +172,7 @@ class MoneyTransferSelf implements dci.Context {
     }
 
     public function transfer() {
-        this.source.withdraw();			
+        this.source.withdraw();
     }
 	
 	@role var utils : {
@@ -190,9 +190,9 @@ class MoneyTransferSelf implements dci.Context {
 		}
 
 		public function withdraw() {
-            self.decreaseBalance(Std.int(amount / 2));
+            SELF.decreaseBalance(Std.int(amount / 2));
 			// Testing RoleMethod access inside own role
-			self.addSource(self).decreaseBalance(Std.int(amount / 2));
+			Self.addSource(self).decreaseBalance(Std.int(amount / 2));
             destination.deposit();
 		}		
 	}
