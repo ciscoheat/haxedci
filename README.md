@@ -24,7 +24,7 @@ Let's start with a simple data class called `Account`, containing a few methods:
 
 ```haxe
 class Account {
-    public var name(default, null) : String;
+	public var name(default, null) : String;
 	public var balance(default, null) : Int;
 
 	public function new(name, balance) {
