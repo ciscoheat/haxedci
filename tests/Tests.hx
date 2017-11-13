@@ -56,6 +56,39 @@ class Tests extends BuddySuite implements Buddy<[Tests]> {
 				}
 			});
 			#end
+			
+			it("should pass the 'dci torture test'", {
+				var player = new Human();
+				var cpu = new Cyborg();
+				
+				var b1 = new Battle("1", player, cpu);
+				var b2 = new Battle("2", cpu, player);
+				var b3 = new Battle("3", cpu, cpu);
+				
+				b1.start();
+				b2.start();
+				b3.start();
+				b1.interview();
+				
+				var expected = "
+1 battle commencing:
+1 [Jack] Grrrr.....
+1 [Cyborg] Meow.....
+2 battle commencing:
+2 [Cyborg] Grrrr.....
+2 [Jack] Meow.....
+3 battle commencing:
+3 [Cyborg] Grrrr.....
+3 [Cyborg] Meow.....
+[Interviewer] Hello!
+[Jack] says Hello!
+[Interviewer] Hello!
+[Cyborg] bleeps Hello!".trim();
+
+				var gold = ~/[\r\n]+/g.split(expected);
+				
+				gold.should.containExactly(Interviewer.output);
+			});
 		});
     }
 }
@@ -208,4 +241,88 @@ class MoneyTransferSelf implements dci.Context {
             testDestination = self.increaseBalance(amount).name + utils.concat(namePublic, self.namePrivate);
         }
     }
+}
+
+///////////////////////////////////////////////////////////////////////////////////////
+
+class Interviewer
+{
+	public static var output : Array<String> = [];
+	
+	public static function doInterview(player : Dynamic) {
+		output.push('[Interviewer] Hello!');
+		player.say();
+	}
+	
+	public static function callback(fn : Dynamic) {
+		fn();
+	}
+}
+
+class Battle implements dci.Context
+{
+	public function new(id, firstPlayer, secondPlayer) {
+		this.id = id;
+		this.bear = firstPlayer;
+		this.lion = secondPlayer;
+	}
+	
+	public function start() {
+		Interviewer.output.push(id + " battle commencing:");
+		bear.fight();
+	}
+	
+	public function interview() {
+		Interviewer.doInterview(bear);
+		Interviewer.doInterview(lion);
+	}
+	
+	var id : String;
+	
+	@role var bear : {
+		var name : String;
+		
+		function say() {
+			Interviewer.output.push(id + " [" + self.name + "] " + "Grrrr.....");
+		}
+		
+		public function fight() {
+			bear.say();
+			lion.fight();
+		}
+	}
+	
+	@role var lion : {
+		var name : String;
+		
+		function say() {
+			Interviewer.output.push(id + " [" + self.name + "] " + "Meow.....");
+		}
+		
+		public function fight() {
+			Interviewer.callback(function() lion.say());
+		}
+	}	
+}
+
+class Human
+{
+	public var name : String = "Jack";
+	
+	public function say() {
+		Interviewer.output.push("[" + this.name + "] says Hello!");
+	}
+	
+	public function new() {}
+}
+
+class Cyborg
+{
+	public var name : String = "Cyborg";
+	
+	public function say() {
+		Interviewer.output.push("[" + this.name + "] bleeps Hello!");
+	}
+	
+	public function new() {}
 }
