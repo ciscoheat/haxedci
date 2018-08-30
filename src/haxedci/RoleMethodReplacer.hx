@@ -179,8 +179,8 @@ class RoleMethodReplacer
 				return;
 
 			// Autocompletion is different depending on where in the context you are.
-			case EDisplay(e, isCall):
-				new Autocompletion(context, currentRole, currentRoleMethod).replaceDisplay(e, isCall);
+			case EDisplay(e, _):
+				new Autocompletion(context, currentRole, currentRoleMethod).replaceDisplay(e);
 				return;
 				
 			case _:

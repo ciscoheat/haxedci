@@ -38,7 +38,7 @@ class Autocompletion
 	}
 	
 	// e is the Expr inside EDisplay
-	public function replaceDisplay(e : Expr, isCall : Bool) {		
+	public function replaceDisplay(e : Expr) {
 
 		switch e.expr {
 			case EConst(CIdent(roleName)) | EField({expr: EConst(CIdent("this")), pos: _}, roleName)
