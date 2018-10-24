@@ -1,4 +1,5 @@
 # DCI in Haxe
+
 [Haxe](http://haxe.org) is a nice multiplatform language which enables a full DCI implementation. If you don't know what DCI is, keep reading, you're in for a treat!
 
 ## Short introduction
@@ -166,9 +167,11 @@ Note how we're using the contract method only for the actual data operation, the
 
 ### Role field access
 
-RoleMethods must be declared `public` to allow access outside the Role. Contract fields should only be accessed from the Role's own RoleMethods. This enables the ability to trace the flow of cooperation between Roles, instead of any Role being able to call another Role's underlying object at all times. It's a helpful separation between the local reasoning of how Roles interact locally with their object, and how Roles interact with each other. A goal with DCI is readability, and this helps reading and understanding the use-case-level logic of a Context.
+RoleMethods must be declared `public` to allow access outside the Role. Contract fields should only be accessed from the Role's own RoleMethods however. This enables the ability to trace the flow of cooperation between Roles, instead of any Role being able to call another Role's underlying object at all times. It's a helpful separation between the local reasoning of how Roles interact locally with their object, and how Roles interact with each other. A goal with DCI is readability, and this helps reading and understanding the use-case-level logic of a Context.
 
 There *could* be cases when a calling a contract field from another Role is wanted, so contract fields can also be declared `public`, but accessing them will emit a compiler warning, and its presence should be viewed as a compromise measure that explicitly erodes the readability of the code. It is a way for the programmer to say: *“Trust me”* in spite of the fact that readers of the code can’t verify what goes on behind the curtain.
+
+The exception is if you're using Haxe 4 and the contract field is `final`. Then the field is immutable and can be accessed without warning.
 
 ### Accessors: self and this
 
@@ -340,11 +343,12 @@ When designing functionality using RoleMethods in a Context, be careful not to e
 
 Of course the answer is No, DCI isn't suitable for every problem. DCI is an approach to design that builds on a psychological model of the left-brain/right-brain dichotomy. It is just one model, though a very useful one when working close to users and their needs, especially where the discussions end up in a formalized use case.
 
-Some cases don’t lend themselves very well to use cases but are better modeled by state machines, formal logic and rules, or database tables and transaction semantics. Or just simple, atomic MVC. Chances are though, that if you're working with users, domain experts, stakeholders, etc, you'll notice them thinking in Roles, and if you let them do that instead of forcing a class-oriented mental model upon them, they will be happier, and DCI will be a great help!
+Some cases don’t lend themselves very well to use cases but are better modeled by state machines, formal logic and rules, or database tables and transaction semantics. Or just simple, atomic MVC. Chances are though, if you're working with users, domain experts, stakeholders, etc, you'll notice them thinking in Roles, and if you let them do that instead of forcing a class-oriented mental model upon them, they will be happier, and DCI will be a great help!
 
-# A larger example and demo
+# Larger examples and demos
 
-The [haxedci-example](https://github.com/ciscoheat/haxedci-example) repository has a larger example and demo that really showcases the power of DCI and MVC together. Check it out!
+- The [haxedci-example](https://github.com/ciscoheat/haxedci-example) repository has a larger example and demo that really showcases the power of DCI and MVC together. Check it out!
+- [SnakeDCI](https://github.com/ciscoheat/SnakeDCI) is a recreation of the classic Snake game, to show you how DCI works in combination with a game framework.
 
 # Technical notes
 
