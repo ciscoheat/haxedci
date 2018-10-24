@@ -89,9 +89,11 @@ class RoleMethodReplacer
 		function testContractAccess(accessedRole : DciRole, contractMethod : Field, pos : Position) {
 			if (accessedRole == role) return;
 			
-			if (contractMethod.access.has(APublic))
+			if (contractMethod.access.has(APublic)) {
+				#if (haxe_ver >= 4) if(!contractMethod.access.has(AFinal)) #end
 				Context.warning('Contract field ${accessedRole.name}.${contractMethod.name} ' + 
 					'accessed outside its Role.', pos);
+			}
 			else
 				Context.error('Cannot access private contract field ' + 
 				'${accessedRole.name}.${contractMethod.name} outside its Role.', pos);

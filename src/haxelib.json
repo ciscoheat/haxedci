@@ -4,7 +4,7 @@
   "license": "MIT",
   "tags": ["cross", "dci"],
   "description": "A DCI library with clean syntax and autocompletion.",
-  "version": "1.1.1",
-  "releasenote": "Haxe 4 fix for autocompletion.",
+  "version": "1.2.0",
+  "releasenote": "public final Role-object-contracts are now accessible without warning.",
   "contributors": ["ciscoheat"]
 }
