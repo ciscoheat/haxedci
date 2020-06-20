@@ -1,7 +1,7 @@
 import buddy.*;
 import dci.Self;
 
-#if sys
+#if (sys || nodejs)
 import sys.FileSystem;
 import sys.io.Process;
 #end
@@ -41,18 +41,27 @@ class Tests extends BuddySuite implements Buddy<[Tests]> {
 				transfer.testSource.should.be("HomePublic");
 			});	
 			
-			#if sys
+			#if (sys || nodejs)
 			it("should fail compilation for a number of cases", {
 				var files = FileSystem.readDirectory('tests').filter(function(filename) 
 					return filename.startsWith("CompilationTest")
 				);
 				
 				for (filename in files) {
-					var process = new Process("haxe", ['-cp', 'src', '-cp', 'tests', '-x', filename]);
-					if (process.exitCode() == 0) {
+					var args = ['-cp', 'src', '-cp', 'tests', '-x', filename];
+					#if sys
+					if (new Process("haxe", args).exitCode() == 0) {
 						fail(filename + " passed compilation.");
 						break;
 					}
+					#elseif nodejs
+					try {
+						js.node.ChildProcess.execFileSync("haxe", args);
+						fail(filename + " passed compilation.");
+						break;
+					}
+					catch(ex : Dynamic) {}
+					#end
 				}
 			});
 			#end
@@ -83,9 +92,9 @@ class Tests extends BuddySuite implements Buddy<[Tests]> {
 [Interviewer] Hello!
 [Jack] says Hello!
 [Interviewer] Hello!
-[Cyborg] bleeps Hello!".trim();
+[Cyborg] bleeps Hello!";
 
-				var gold = ~/[\r\n]+/g.split(expected);
+				var gold = ~/[\r\n]+/g.split(expected.trim());
 				
 				gold.should.containExactly(Interviewer.output);
 			});
@@ -208,7 +217,7 @@ class MoneyTransferSelf implements dci.Context {
         this.source.withdraw();
     }
 	
-	@role var utils : {
+	@:nullSafety(Off) @role var utils : {
 		public function concat(s1 : String, s2 : String) {
 			return s1 + s2;
 		}
